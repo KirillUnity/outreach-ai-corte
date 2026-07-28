@@ -1,0 +1,53 @@
+# Outreach AI Cortex — Project Rules
+
+## Stack
+- Python 3.12, FastAPI, SQLAlchemy 2.0 (async), PostgreSQL 16, ChromaDB
+- Dependency management: Poetry (pyproject.toml)
+- Containerization: Docker Compose ONLY (no Kubernetes/k3s/Minikube)
+- LLM calls: cloud APIs only (OpenAI, Anthropic, Gemini, OpenRouter)
+
+## Hardware Constraints (CRITICAL)
+- Target machine: 8 GB RAM, Intel Iris Xe (128 MB VRAM)
+- NEVER suggest local AI models (Ollama, transformers, PyTorch, TensorFlow)
+- Docker images: slim/alpine only; total container RAM ≤ 4 GB
+- ChromaDB: minimal persistence, no heavy indexing on dev
+
+## Project Structure
+```
+backend/app/
+├── api/routers/     # HTTP endpoints (thin layer, no business logic)
+├── core/            # config, database, security, dependencies
+├── models/          # SQLAlchemy ORM models
+├── schemas/         # Pydantic request/response schemas
+├── services/        # Business logic (called by routers)
+└── main.py          # FastAPI app factory, lifespan, router registration
+```
+
+## Naming Conventions
+- Files: snake_case (`health.py`, `user_service.py`)
+- Classes: PascalCase (`UserService`, `HealthResponse`)
+- Functions/variables: snake_case
+- Constants: UPPER_SNAKE_CASE
+- API routes: kebab-case URLs (`/api/v1/health`, `/api/v1/outreach-campaigns`)
+- Router prefixes: `/api/v1`
+
+## Code Standards
+- Type hints on ALL function signatures (Python 3.12 syntax)
+- Docstrings: Google style for public functions/classes
+- Async everywhere: async def routes, AsyncSession for DB, httpx for HTTP
+- No business logic in routers — delegate to services/
+- Pydantic v2 for schemas, pydantic-settings for config
+- SQLAlchemy 2.0 style: select(), no legacy Query API
+
+## Docker Rules
+- Base image: python:3.12-slim (NOT alpine for Python — musl breaks asyncpg wheels)
+- Always use depends_on with condition: service_healthy
+- Always define healthcheck for every service
+- Set mem_limit on each container
+
+## Forbidden
+- Local LLM inference
+- Sync SQLAlchemy in new code
+- Hardcoded secrets (use .env + pydantic-settings)
+- Committing .env file
+- kubernetes/helm/minikube mentions

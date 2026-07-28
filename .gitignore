@@ -216,3 +216,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ── Outreach AI Cortex ──
+.env
+!.env.example
+
+# Poetry
+poetry.toml
+
+# Docker
+docker-compose.override.yml
+
+# IDE
+.idea/
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Chroma / data
+chroma_data/
+postgres_data/
