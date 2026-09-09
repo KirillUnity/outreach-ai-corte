@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 from sqlalchemy import text
 
-from app.api.routers import companies, health
+from app.api.routers import companies, domain_health, email_drafts, health, persons
 from app.core.config import settings
 from app.core.database import engine
 
@@ -33,3 +33,6 @@ app = FastAPI(
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(companies.router, prefix="/api/v1")
+app.include_router(persons.router, prefix="/api/v1")
+app.include_router(email_drafts.router, prefix="/api/v1")
+app.include_router(domain_health.router, prefix="/api/v1")

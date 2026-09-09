@@ -55,6 +55,40 @@ curl -s -o /dev/null -w "%{http_code}\n" -X DELETE http://localhost:8080/api/v1/
 
 `domain` is normalized: scheme, `www.`, path and port are stripped; stored as `acme.com`.
 
+### Persons
+
+| Method | Path | Status | Description |
+|--------|------|--------|-------------|
+| POST | `/persons/` | 201, 404, 409 | Create person (unique `linkedin_url` / `email`) |
+| GET | `/persons/` | 200 | Paginated list (`limit`, `offset`, optional `company_id`) |
+| GET | `/persons/{person_id}` | 200, 404 | Get with nested `company` |
+| PATCH | `/persons/{person_id}` | 200, 404, 409 | Partial update |
+| DELETE | `/persons/{person_id}` | 204, 404 | Delete person (drafts CASCADE) |
+| POST | `/persons/{person_id}/company` | 200, 404 | Bind to an existing company |
+
+### Email drafts
+
+| Method | Path | Status | Description |
+|--------|------|--------|-------------|
+| POST | `/email-drafts/` | 201, 404 | Create draft (`person_id` must exist) |
+| GET | `/email-drafts/` | 200 | Paginated list (optional `person_id`) |
+| GET | `/email-drafts/{draft_id}` | 200, 404 | Get with nested `person` |
+| PATCH | `/email-drafts/{draft_id}` | 200, 404 | Partial update |
+| DELETE | `/email-drafts/{draft_id}` | 204, 404 | Delete draft |
+| POST | `/email-drafts/{draft_id}/mark-sent` | 200, 404 | Set `is_sent=true`, `sent_at=now(UTC)` |
+
+### Deliverability (domain health)
+
+Resource is named by capability, not table name: `/deliverability`.
+
+| Method | Path | Status | Description |
+|--------|------|--------|-------------|
+| POST | `/deliverability/` | 201 or 200 | Upsert by domain (create / replace) |
+| GET | `/deliverability/` | 200 | Paginated list |
+| GET | `/deliverability/{domain}` | 200, 404 | Get by domain |
+| PATCH | `/deliverability/{domain}` | 200, 404, 409 | Partial update |
+| DELETE | `/deliverability/{domain}` | 204, 404 | Delete snapshot |
+
 ## Migrations
 
 ```bash
