@@ -1,5 +1,7 @@
 """Person business logic (CRUD + company binding)."""
 
+import logging
+import re
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -7,18 +9,32 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
+from app.models.company import Company
 from app.models.enums import EmailStatus
 from app.models.person import Person
-from app.schemas.person import PersonCreate, PersonUpdate
+from app.schemas.company import CompanyCreate
+from app.schemas.person import PersonCreate, PersonUpdate, normalize_linkedin_url
 from app.services.company_service import CompanyService
 from app.services.exceptions import DuplicateError, NotFoundError
+from app.services.linkedin_service import LinkedInService
+
+logger = logging.getLogger(__name__)
 
 
 class PersonService:
     """CRUD operations for `Person` using an injected async session."""
 
-    def __init__(self, db: AsyncSession) -> None:
+    def __init__(self, db: AsyncSession, linkedin_service: LinkedInService | None = None) -> None:
         self.db = db
+        self._linkedin_service = linkedin_service
+
+    @property
+    def linkedin_service(self) -> LinkedInService:
+        """Lazy default so tests can inject a fake LinkedIn adapter."""
+        if self._linkedin_service is None:
+            self._linkedin_service = LinkedInService(settings)
+        return self._linkedin_service
 
     async def create(self, data: PersonCreate) -> Person:
         """Insert a person. Validates company_id and unique linkedin_url / email."""
@@ -155,3 +171,73 @@ class PersonService:
             existing = await self.get_by_email(email)
             if existing is not None and existing.id != exclude_id:
                 raise DuplicateError(f"Person with email '{email}' already exists")
+
+    async def research_from_linkedin(
+        self,
+        linkedin_url: str,
+        company_domain: str | None = None,
+    ) -> tuple[Person, Company | None, str]:
+        """Enrich a person from LinkedIn. Cache hit skips the external adapter."""
+        url = normalize_linkedin_url(linkedin_url)
+        existing = await self.get_by_linkedin(url)
+        if existing is not None:
+            company = None
+            if existing.company_id is not None:
+                company = await CompanyService(self.db).get_by_id(existing.company_id)
+            logger.info("linkedin cache hit url=%s person_id=%s", url, existing.id)
+            return existing, company, "cache"
+
+        logger.info("linkedin research start url=%s", url)
+        profile = await self.linkedin_service.get_profile(url)
+        company = await self._resolve_company(profile.current_company, company_domain)
+
+        person = await self.create(
+            PersonCreate(
+                first_name=profile.first_name,
+                last_name=profile.last_name,
+                linkedin_url=url,
+                title=profile.current_title,
+                company_id=company.id if company is not None else None,
+                raw_linkedin_data=profile.model_dump(),
+            )
+        )
+        logger.info(
+            "linkedin research created person_id=%s company_id=%s source=%s",
+            person.id,
+            company.id if company else None,
+            profile.source,
+        )
+        return person, company, profile.source
+
+    async def _resolve_company(
+        self,
+        company_name: str | None,
+        company_domain: str | None,
+    ) -> Company | None:
+        companies = CompanyService(self.db)
+        if company_domain:
+            found = await companies.get_by_domain(company_domain)
+            if found is None:
+                raise NotFoundError(f"Company '{company_domain}' not found")
+            return found
+        if not company_name:
+            return None
+        found = await companies.get_by_name(company_name)
+        if found is not None:
+            return found
+        domain = _slugify_domain(company_name)
+        existing_domain = await companies.get_by_domain(domain)
+        if existing_domain is not None:
+            return existing_domain
+        try:
+            return await companies.create(CompanyCreate(domain=domain, name=company_name))
+        except IntegrityError:
+            return await companies.get_by_domain(domain)
+
+
+def _slugify_domain(name: str) -> str:
+    """Turn 'Acme Corp' into acme-corp.com for auto-created companies."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    if not slug:
+        slug = "unknown"
+    return f"{slug}.com"

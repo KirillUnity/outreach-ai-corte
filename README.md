@@ -66,6 +66,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X DELETE http://localhost:8080/api/v1/
 | PATCH | `/persons/{person_id}` | 200, 404, 409 | Partial update |
 | DELETE | `/persons/{person_id}` | 204, 404 | Delete person (drafts CASCADE) |
 | POST | `/persons/{person_id}/company` | 200, 404 | Bind to an existing company |
+| POST | `/persons/research` | 200, 400, 404, 422, 502 | Enrich from LinkedIn URL (mock or Phantombuster) |
 
 ### Email drafts
 
@@ -117,6 +118,38 @@ curl -s -X POST http://localhost:8080/api/v1/companies/ \
 
 curl -s -X POST http://localhost:8080/api/v1/companies/stripe.com/research
 ```
+
+## LinkedIn Integration
+
+The project supports two modes. Default is **mock** so local work needs no third-party keys.
+
+### Mock mode (default)
+
+Deterministic fake profiles from `sha256(username)`. Same URL always yields the same name/title/company. Fine for local dev and pytest.
+
+```
+LINKEDIN_MODE=mock
+```
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/persons/research \
+  -H "Content-Type: application/json" \
+  -d '{"linkedin_url":"https://linkedin.com/in/johndoe"}'
+```
+
+A second POST with the same URL returns `source=cache` and the same `person.id`.
+
+### Real mode (Phantombuster)
+
+Launches a LinkedIn Profile Scraper phantom and polls `fetch-output`. On HTTP/timeout/empty output the service **falls back to mock** and logs a warning.
+
+```
+LINKEDIN_MODE=real
+PHANTOMBUSTER_API_KEY=your_key_here
+LINKEDIN_PHANTOMBUSTER_PHANTOM_ID=your_agent_id
+```
+
+We never scrape LinkedIn from this repo (ToS / legal). Design notes: [research/linkedin-mock-vs-real.md](research/linkedin-mock-vs-real.md).
 
 ## Docs
 

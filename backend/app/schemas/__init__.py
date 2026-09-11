@@ -20,6 +20,11 @@ from app.schemas.email_draft import (
     EmailDraftUpdate,
     EmailDraftWithPersonResponse,
 )
+from app.schemas.linkedin import (
+    LinkedInProfile,
+    PersonResearchRequest,
+    PersonResearchResponse,
+)
 from app.schemas.person import (
     PersonCompanyAssign,
     PersonCreate,
@@ -44,9 +49,12 @@ __all__ = [
     "EmailDraftResponse",
     "EmailDraftUpdate",
     "EmailDraftWithPersonResponse",
+    "LinkedInProfile",
     "PersonCompanyAssign",
     "PersonCreate",
     "PersonListResponse",
+    "PersonResearchRequest",
+    "PersonResearchResponse",
     "PersonResponse",
     "PersonUpdate",
     "PersonWithCompanyResponse",

@@ -52,6 +52,13 @@ class CompanyService:
         result = await self.db.execute(select(Company).where(Company.id == id))
         return result.scalar_one_or_none()
 
+    async def get_by_name(self, name: str) -> Company | None:
+        """Case-insensitive match on company name. First hit wins."""
+        result = await self.db.execute(
+            select(Company).where(func.lower(Company.name) == name.strip().lower()).limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def list(self, limit: int = 20, offset: int = 0) -> tuple[list[Company], int]:
         """Return a page of companies and the total row count."""
         total_result = await self.db.execute(select(func.count()).select_from(Company))
