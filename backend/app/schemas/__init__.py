@@ -3,6 +3,7 @@
 from app.schemas.company import (
     CompanyCreate,
     CompanyListResponse,
+    CompanyResearchResponse,
     CompanyResponse,
     CompanyUpdate,
 )
@@ -31,6 +32,7 @@ from app.schemas.person import (
 __all__ = [
     "CompanyCreate",
     "CompanyListResponse",
+    "CompanyResearchResponse",
     "CompanyResponse",
     "CompanyUpdate",
     "DomainHealthCreate",

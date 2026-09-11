@@ -87,3 +87,12 @@ class CompanyListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class CompanyResearchResponse(BaseModel):
+    """Result of POST /companies/{domain}/research."""
+
+    company: CompanyResponse
+    pages_parsed: int
+    errors: list[str] = []
+    research_duration_seconds: float

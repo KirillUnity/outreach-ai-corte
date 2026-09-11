@@ -1,20 +1,34 @@
 """Company business logic (CRUD). Session is injected — do not inherit from AsyncSession."""
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.company import Company
 from app.schemas.company import CompanyCreate, CompanyUpdate
+from app.services.exceptions import NotFoundError
+from app.services.site_parser import ParseResult, SiteParser
+
+logger = logging.getLogger(__name__)
 
 
 class CompanyService:
     """CRUD operations for `Company` using an injected async session."""
 
-    def __init__(self, db: AsyncSession) -> None:
+    def __init__(self, db: AsyncSession, parser: SiteParser | None = None) -> None:
         self.db = db
+        self._parser = parser
+
+    @property
+    def parser(self) -> SiteParser:
+        """Lazy default parser so tests can inject a fake without touching the network."""
+        if self._parser is None:
+            self._parser = SiteParser(settings)
+        return self._parser
 
     async def create(self, data: CompanyCreate) -> Company:
         """Insert a company. Caller should handle IntegrityError as a duplicate domain."""
@@ -74,3 +88,27 @@ class CompanyService:
         await self.db.delete(company)
         await self.db.commit()
         return True
+
+    async def research(self, domain: str) -> tuple[Company, ParseResult]:
+        """Parse the company site and persist raw_site_text (and empty name/description)."""
+        company = await self.get_by_domain(domain)
+        if company is None:
+            raise NotFoundError(f"Company '{domain}' not found")
+
+        parsed = await self.parser.parse_company_site(domain)
+        company.raw_site_text = parsed.raw_text
+        if not company.description and parsed.description:
+            company.description = parsed.description
+        if not company.name and parsed.title:
+            company.name = parsed.title[:255]
+
+        await self.db.commit()
+        await self.db.refresh(company)
+        logger.info(
+            "research done domain=%s pages=%s errors=%s chars=%s",
+            domain,
+            parsed.pages_parsed,
+            len(parsed.errors),
+            len(parsed.raw_text),
+        )
+        return company, parsed

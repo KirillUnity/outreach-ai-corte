@@ -1,5 +1,8 @@
 """Company CRUD endpoints."""
 
+import logging
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,10 +11,14 @@ from app.api.deps import get_db
 from app.schemas.company import (
     CompanyCreate,
     CompanyListResponse,
+    CompanyResearchResponse,
     CompanyResponse,
     CompanyUpdate,
 )
 from app.services.company_service import CompanyService
+from app.services.exceptions import NotFoundError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -85,6 +92,45 @@ async def get_company(
             detail=f"Company '{domain}' not found",
         )
     return CompanyResponse.model_validate(company)
+
+
+@router.post(
+    "/{domain}/research",
+    response_model=CompanyResearchResponse,
+    summary="Research company website",
+)
+async def research_company(
+    domain: str,
+    db: AsyncSession = Depends(get_db),
+) -> CompanyResearchResponse:
+    """Parse the company site and store raw_site_text for later RAG."""
+    service = _service(db)
+    existing = await service.get_by_domain(domain)
+    if existing is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Company '{domain}' not found",
+        )
+
+    start = time.perf_counter()
+    try:
+        company, parsed = await service.research(domain)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.detail) from None
+    except Exception as exc:
+        logger.exception("Research failed for %s", domain)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Research failed: {exc}",
+        ) from None
+
+    duration = time.perf_counter() - start
+    return CompanyResearchResponse(
+        company=CompanyResponse.model_validate(company),
+        pages_parsed=parsed.pages_parsed,
+        errors=parsed.errors,
+        research_duration_seconds=round(duration, 2),
+    )
 
 
 @router.patch(

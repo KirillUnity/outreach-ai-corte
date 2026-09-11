@@ -17,7 +17,7 @@ RUN apt-get update \
 COPY pyproject.toml poetry.lock* ./
 
 RUN if [ ! -f poetry.lock ]; then poetry lock; fi \
-    && poetry install --no-ansi --no-root --only main
+    && poetry install --no-ansi --no-root
 
 COPY backend ./backend
 

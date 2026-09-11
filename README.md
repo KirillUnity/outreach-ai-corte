@@ -37,6 +37,7 @@ Base URL: `http://localhost:8080/api/v1`
 | GET | `/companies/{domain}` | 200, 404 | Get by domain |
 | PATCH | `/companies/{domain}` | 200, 404, 409 | Partial update |
 | DELETE | `/companies/{domain}` | 204, 404 | Delete company |
+| POST | `/companies/{domain}/research` | 200, 404, 502 | Parse site, save `raw_site_text` |
 
 Example:
 
@@ -98,6 +99,24 @@ docker compose exec api poetry run alembic current
 ```
 
 Always review the generated file under `backend/alembic/versions/` before applying.
+
+## Site parser
+
+`POST /api/v1/companies/{domain}/research` fetches `https://{domain}` plus a few product/about paths.
+
+- **httpx** — async HTTP (same event loop as FastAPI)
+- **trafilatura** — main-content extraction (drops nav/footer chrome)
+- **BeautifulSoup + lxml** — title/meta and fallback if trafilatura returns nothing
+
+Text is capped at `PARSER_MAX_TEXT_LENGTH` (default 50_000). Fetch failures are returned in `errors` (HTTP 200); unknown company is 404; unexpected crashes are 502.
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/companies/ \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"stripe.com","name":"Stripe"}'
+
+curl -s -X POST http://localhost:8080/api/v1/companies/stripe.com/research
+```
 
 ## Docs
 

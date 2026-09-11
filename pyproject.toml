@@ -15,6 +15,9 @@ asyncpg = "^0.30.0"
 pydantic-settings = "^2.6.1"
 httpx = "^0.28.1"
 alembic = "^1.14.0"
+beautifulsoup4 = "^4.12.3"
+lxml = "^5.3.0"
+trafilatura = "^2.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
@@ -34,3 +37,8 @@ target-version = "py312"
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["backend"]
+testpaths = ["backend/tests"]
