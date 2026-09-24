@@ -1,5 +1,6 @@
 """Pydantic request/response schemas."""
 
+from app.schemas.agent import AgentRunListResponse, AgentRunRequest, AgentRunResponse
 from app.schemas.company import (
     CompanyContextResponse,
     CompanyCreate,
@@ -39,6 +40,9 @@ from app.schemas.person import (
 )
 
 __all__ = [
+    "AgentRunListResponse",
+    "AgentRunRequest",
+    "AgentRunResponse",
     "CompanyContextResponse",
     "CompanyCreate",
     "CompanyListResponse",

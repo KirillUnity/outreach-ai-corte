@@ -1,0 +1,27 @@
+---
+title: Outreach AI Cortex — Day 8 agent
+---
+flowchart TD
+    load_person[load_person]
+    research_company[research_company]
+    retrieve_rag[retrieve_rag]
+    generate_email[generate_email]
+    validate_email[validate_email]
+    check_deliverability[check_deliverability]
+    decide[decide]
+    save_draft[save_draft]
+    save_and_send[save_and_send]
+    END((END))
+
+    load_person -->|errors| END
+    load_person --> research_company
+    research_company --> retrieve_rag
+    retrieve_rag --> generate_email
+    generate_email --> validate_email
+    validate_email -->|errors and iteration less than 2| generate_email
+    validate_email --> check_deliverability
+    check_deliverability --> decide
+    decide -->|send| save_and_send
+    decide -->|hold or reject| save_draft
+    save_draft --> END
+    save_and_send --> END

@@ -20,6 +20,8 @@ RUN if [ ! -f poetry.lock ]; then poetry lock; fi \
     && poetry install --no-ansi --no-root
 
 COPY backend ./backend
+COPY scripts ./scripts
+COPY docs ./docs
 
 WORKDIR /app/backend
 

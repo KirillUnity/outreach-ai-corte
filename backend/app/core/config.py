@@ -58,6 +58,18 @@ class LLMSettings(BaseModel):
     request_timeout: int = 60
 
 
+class AgentSettings(BaseModel):
+    """LangGraph outreach-agent knobs. Approval stays on in dev on purpose."""
+
+    max_iterations: int = 10
+    enable_checkpointing: bool = True
+    checkpointer_table: str = "agent_checkpoints"
+    auto_send_threshold: float = 0.8
+    require_deliverability_check: bool = True
+    require_human_approval: bool = True
+    sender_domain: str = ""
+
+
 class LinkedInSettings(BaseModel):
     """LinkedIn enrichment: mock (default) or Phantombuster."""
 
@@ -95,6 +107,7 @@ class Settings(BaseSettings):
     linkedin: LinkedInSettings = Field(default_factory=LinkedInSettings)
     rag: RAGSettings = Field(default_factory=RAGSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    agent: AgentSettings = Field(default_factory=AgentSettings)
     # Convenience aliases so .env can use flat names from the Day 6/7 specs.
     phantombuster_api_key: str = ""
     openai_api_key: str = ""
@@ -115,6 +128,11 @@ class Settings(BaseSettings):
     def chroma_base_url(self) -> str:
         """Base URL for ChromaDB HTTP API."""
         return f"http://{self.chroma_host}:{self.chroma_port}"
+
+    @property
+    def database_url_sync(self) -> str:
+        """psycopg-style URL for LangGraph's Postgres checkpointer."""
+        return self.database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
 
     def model_post_init(self, __context: object) -> None:
         """Copy flat env aliases into nested settings."""

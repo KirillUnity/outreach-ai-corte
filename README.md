@@ -69,6 +69,8 @@ curl -s -o /dev/null -w "%{http_code}\n" -X DELETE http://localhost:8080/api/v1/
 | POST | `/persons/{person_id}/company` | 200, 404 | Bind to an existing company |
 | POST | `/persons/research` | 200, 400, 404, 422, 502 | Enrich from LinkedIn URL (mock or Phantombuster) |
 | POST | `/persons/{person_id}/generate-email` | 200, 400, 404, 502 | RAG + LLM draft, save EmailDraft |
+| POST | `/agent/outreach` | 200, 502 | LangGraph: research → generate → decide |
+| GET | `/agent/runs` | 200 | Agent run history (`person_id`, `limit`, `offset`) |
 
 ### Email drafts
 
@@ -102,6 +104,12 @@ docker compose exec api poetry run alembic current
 ```
 
 Always review the generated file under `backend/alembic/versions/` before applying.
+
+Day 8 adds `agent_runs` (`e8c0a1b2d3e4`). Apply it after pull:
+
+```bash
+docker compose exec api poetry run alembic upgrade head
+```
 
 ## Site parser
 
@@ -191,6 +199,54 @@ curl -s -X POST http://localhost:8080/api/v1/persons/{person_id}/generate-email 
 ```
 
 Prompt notes: [research/llm-prompt-engineering-for-outreach.md](research/llm-prompt-engineering-for-outreach.md) · all templates: [PROMPTS.md](PROMPTS.md)
+
+## AI Agent
+
+`POST /api/v1/agent/outreach` runs a **LangGraph** `StateGraph` instead of a single generate call.
+
+```mermaid
+flowchart TD
+    load_person[load_person] -->|errors| END
+    load_person --> research_company
+    research_company --> retrieve_rag
+    retrieve_rag --> generate_email
+    generate_email --> validate_email
+    validate_email -->|dirty draft and iteration less than 2| generate_email
+    validate_email --> check_deliverability
+    check_deliverability --> decide
+    decide -->|send| save_and_send
+    decide -->|hold or reject| save_draft
+```
+
+| Node | What it does |
+|------|----------------|
+| `load_person` | Load Person + Company |
+| `research_company` | Parse/index the site if `raw_site_text` is empty |
+| `retrieve_rag` | Chroma search |
+| `generate_email` | Cloud LLM (or `LLM_MODE=mock`) |
+| `validate_email` | Spam / CAPS / forbidden phrases |
+| `check_deliverability` | SPF+DKIM snapshot for the sending domain |
+| `decide` | `send` / `hold` / `reject` |
+| `save_draft` | Persist for audit (including rejects) |
+| `save_and_send` | Save + stub `mark_sent` (SMTP in Day 10) |
+
+Default `AGENT_REQUIRE_HUMAN_APPROVAL=true` so a clean draft still **holds**. Set it `false` only when you intend auto-send. `send_email` is a stub — no SMTP yet.
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/agent/outreach \
+  -H "Content-Type: application/json" \
+  -d '{
+    "person_id": "{person_id}",
+    "goal": "meeting",
+    "sender_name": "Kirill",
+    "sender_title": "Founder",
+    "sender_company": "AI Cortex"
+  }'
+
+curl -s "http://localhost:8080/api/v1/agent/runs?person_id={person_id}"
+```
+
+Mermaid source: [docs/agent_graph.mmd](docs/agent_graph.mmd). Why LangGraph: [research/langgraph-vs-langchain-agents.md](research/langgraph-vs-langchain-agents.md). After `alembic upgrade head`, `agent_runs` stores `final_state` for debugging.
 
 ## Docs
 
