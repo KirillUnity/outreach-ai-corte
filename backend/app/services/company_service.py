@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.models.company import Company
 from app.schemas.company import CompanyCreate, CompanyUpdate
 from app.services.exceptions import NotFoundError
+from app.services.rag_service import RAGService
 from app.services.site_parser import ParseResult, SiteParser
 
 logger = logging.getLogger(__name__)
@@ -19,9 +20,15 @@ logger = logging.getLogger(__name__)
 class CompanyService:
     """CRUD operations for `Company` using an injected async session."""
 
-    def __init__(self, db: AsyncSession, parser: SiteParser | None = None) -> None:
+    def __init__(
+        self,
+        db: AsyncSession,
+        parser: SiteParser | None = None,
+        rag: RAGService | None = None,
+    ) -> None:
         self.db = db
         self._parser = parser
+        self._rag = rag
 
     @property
     def parser(self) -> SiteParser:
@@ -29,6 +36,13 @@ class CompanyService:
         if self._parser is None:
             self._parser = SiteParser(settings)
         return self._parser
+
+    @property
+    def rag(self) -> RAGService:
+        """Lazy RAG so tests can inject a fake embedder / Chroma client."""
+        if self._rag is None:
+            self._rag = RAGService(settings)
+        return self._rag
 
     async def create(self, data: CompanyCreate) -> Company:
         """Insert a company. Caller should handle IntegrityError as a duplicate domain."""
@@ -96,14 +110,15 @@ class CompanyService:
         await self.db.commit()
         return True
 
-    async def research(self, domain: str) -> tuple[Company, ParseResult]:
-        """Parse the company site and persist raw_site_text (and empty name/description)."""
+    async def research(self, domain: str) -> tuple[Company, ParseResult, int]:
+        """Parse the site, persist raw_site_text, then index chunks in Chroma."""
         company = await self.get_by_domain(domain)
         if company is None:
             raise NotFoundError(f"Company '{domain}' not found")
 
         parsed = await self.parser.parse_company_site(domain)
-        company.raw_site_text = parsed.raw_text
+        if parsed.raw_text:
+            company.raw_site_text = parsed.raw_text
         if not company.description and parsed.description:
             company.description = parsed.description
         if not company.name and parsed.title:
@@ -111,11 +126,25 @@ class CompanyService:
 
         await self.db.commit()
         await self.db.refresh(company)
+
+        chunks_indexed = 0
+        if company.raw_site_text:
+            try:
+                chunks_indexed = await self.rag.index_company(
+                    company_id=company.id,
+                    domain=company.domain,
+                    text=company.raw_site_text,
+                )
+            except Exception as exc:
+                logger.exception("RAG index failed domain=%s", domain)
+                parsed.errors.append(f"RAG index failed: {exc}")
+
         logger.info(
-            "research done domain=%s pages=%s errors=%s chars=%s",
+            "research done domain=%s pages=%s errors=%s chars=%s chunks=%s",
             domain,
             parsed.pages_parsed,
             len(parsed.errors),
             len(parsed.raw_text),
+            chunks_indexed,
         )
-        return company, parsed
+        return company, parsed, chunks_indexed

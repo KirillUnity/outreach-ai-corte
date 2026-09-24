@@ -37,7 +37,8 @@ Base URL: `http://localhost:8080/api/v1`
 | GET | `/companies/{domain}` | 200, 404 | Get by domain |
 | PATCH | `/companies/{domain}` | 200, 404, 409 | Partial update |
 | DELETE | `/companies/{domain}` | 204, 404 | Delete company |
-| POST | `/companies/{domain}/research` | 200, 404, 502 | Parse site, save `raw_site_text` |
+| POST | `/companies/{domain}/research` | 200, 404, 502 | Parse site, save `raw_site_text`, index RAG chunks |
+| GET | `/companies/{domain}/context` | 200, 404, 502 | Semantic search (`q`, `top_k`) over indexed chunks |
 
 Example:
 
@@ -118,6 +119,22 @@ curl -s -X POST http://localhost:8080/api/v1/companies/ \
 
 curl -s -X POST http://localhost:8080/api/v1/companies/stripe.com/research
 ```
+
+The research response includes `chunks_indexed` after the site text is split and stored in Chroma.
+
+## RAG (Chroma + cloud embeddings)
+
+No local models. Default `RAG_MODE=mock` hashes chunks into unit vectors so CI works without an API key. `RAG_MODE=real` calls OpenAI `text-embedding-3-small` (or OpenRouter if `RAG_OPENAI_BASE_URL` is set).
+
+- **CompanyTextSplitter** — `RecursiveCharacterTextSplitter` (1000 / 200 overlap), drop chunks shorter than 50 chars, cap source at 1M chars
+- **RAGService** — delete + recreate `company_{domain}`, cosine HNSW, `tiktoken` token estimate
+- **GET** `/api/v1/companies/{domain}/context?q=pricing` — top-k semantic search
+
+```bash
+curl -s "http://localhost:8080/api/v1/companies/stripe.com/context?q=pricing&top_k=3"
+```
+
+Health (`GET /api/v1/health`) pings Chroma through the shared `HttpClient` singleton.
 
 ## LinkedIn Integration
 

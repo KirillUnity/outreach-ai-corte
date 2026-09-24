@@ -21,6 +21,28 @@ class ParserSettings(BaseModel):
     )
 
 
+class RAGSettings(BaseModel):
+    """Chunking + cloud embeddings + Chroma collection layout.
+
+    Embeddings are cloud-only (OpenAI / OpenRouter). `mode=mock` is a
+    hash-vector stand-in for CI — not a local neural model.
+    """
+
+    mode: Literal["mock", "real"] = "mock"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1536
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+    top_k: int = 5
+    chroma_host: str = "chromadb"
+    chroma_port: int = 8000
+    collection_prefix: str = "company_"
+    openai_api_key: str = ""
+    openai_base_url: str = ""
+    max_source_chars: int = 1_000_000
+    min_chunk_chars: int = 50
+
+
 class LinkedInSettings(BaseModel):
     """LinkedIn enrichment: mock (default) or Phantombuster."""
 
@@ -56,8 +78,15 @@ class Settings(BaseSettings):
 
     parser: ParserSettings = Field(default_factory=ParserSettings)
     linkedin: LinkedInSettings = Field(default_factory=LinkedInSettings)
-    # Convenience alias so .env can use PHANTOMBUSTER_API_KEY without a nested prefix.
+    rag: RAGSettings = Field(default_factory=RAGSettings)
+    # Convenience aliases so .env can use flat names from the Day 6 spec.
     phantombuster_api_key: str = ""
+    openai_api_key: str = ""
+    rag_mode: Literal["mock", "real"] = "mock"
+    embedding_model: str = "text-embedding-3-small"
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+    top_k: int = 5
 
     @property
     def chroma_base_url(self) -> str:
@@ -65,9 +94,18 @@ class Settings(BaseSettings):
         return f"http://{self.chroma_host}:{self.chroma_port}"
 
     def model_post_init(self, __context: object) -> None:
-        """Copy top-level PHANTOMBUSTER_API_KEY into nested LinkedIn settings."""
+        """Copy flat env aliases into nested settings."""
         if self.phantombuster_api_key and not self.linkedin.phantombuster_api_key:
             self.linkedin.phantombuster_api_key = self.phantombuster_api_key
+        self.rag.mode = self.rag_mode
+        self.rag.chroma_host = self.chroma_host
+        self.rag.chroma_port = self.chroma_port
+        self.rag.embedding_model = self.embedding_model
+        self.rag.chunk_size = self.chunk_size
+        self.rag.chunk_overlap = self.chunk_overlap
+        self.rag.top_k = self.top_k
+        if self.openai_api_key and not self.rag.openai_api_key:
+            self.rag.openai_api_key = self.openai_api_key
 
 
 settings = Settings()

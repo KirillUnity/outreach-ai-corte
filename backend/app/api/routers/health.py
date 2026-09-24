@@ -1,14 +1,15 @@
 """Health check endpoint — verifies PostgreSQL and ChromaDB connectivity."""
 
-import httpx
+import asyncio
+
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.database import get_db
+from app.services.chroma_client import get_chroma_client, reset_chroma_client
 
 router = APIRouter()
 
@@ -37,15 +38,17 @@ async def _check_postgres(db: AsyncSession) -> ServiceCheck:
         return ServiceCheck(status="down", detail=str(exc))
 
 
+def _chroma_heartbeat() -> None:
+    get_chroma_client().heartbeat()
+
+
 async def _check_chromadb() -> ServiceCheck:
-    """Ping ChromaDB heartbeat endpoint."""
-    url = f"{settings.chroma_base_url}/api/v1/heartbeat"
+    """Ping ChromaDB through the shared HttpClient (not a raw HTTP guess)."""
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url)
-            response.raise_for_status()
+        await asyncio.to_thread(_chroma_heartbeat)
         return ServiceCheck(status="up")
     except Exception as exc:
+        reset_chroma_client()
         return ServiceCheck(status="down", detail=str(exc))
 
 

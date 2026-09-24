@@ -94,5 +94,23 @@ class CompanyResearchResponse(BaseModel):
 
     company: CompanyResponse
     pages_parsed: int
+    chunks_indexed: int = 0
     errors: list[str] = []
     research_duration_seconds: float
+
+
+class RAGChunk(BaseModel):
+    """One retrieved chunk from Chroma."""
+
+    text: str
+    score: float | None = None
+    chunk_index: int | None = None
+    metadata: dict = Field(default_factory=dict)
+
+
+class CompanyContextResponse(BaseModel):
+    """Semantic search over a company's indexed site text."""
+
+    domain: str
+    query: str
+    chunks: list[RAGChunk]

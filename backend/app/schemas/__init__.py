@@ -1,11 +1,13 @@
 """Pydantic request/response schemas."""
 
 from app.schemas.company import (
+    CompanyContextResponse,
     CompanyCreate,
     CompanyListResponse,
     CompanyResearchResponse,
     CompanyResponse,
     CompanyUpdate,
+    RAGChunk,
 )
 from app.schemas.domain_health import (
     DomainHealthCreate,
@@ -35,11 +37,13 @@ from app.schemas.person import (
 )
 
 __all__ = [
+    "CompanyContextResponse",
     "CompanyCreate",
     "CompanyListResponse",
     "CompanyResearchResponse",
     "CompanyResponse",
     "CompanyUpdate",
+    "RAGChunk",
     "DomainHealthCreate",
     "DomainHealthListResponse",
     "DomainHealthResponse",

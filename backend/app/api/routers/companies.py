@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.schemas.company import (
+    CompanyContextResponse,
     CompanyCreate,
     CompanyListResponse,
     CompanyResearchResponse,
     CompanyResponse,
     CompanyUpdate,
+    RAGChunk,
 )
 from app.services.company_service import CompanyService
 from app.services.exceptions import NotFoundError
@@ -114,7 +116,7 @@ async def research_company(
 
     start = time.perf_counter()
     try:
-        company, parsed = await service.research(domain)
+        company, parsed, chunks_indexed = await service.research(domain)
     except NotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.detail) from None
     except Exception as exc:
@@ -128,8 +130,51 @@ async def research_company(
     return CompanyResearchResponse(
         company=CompanyResponse.model_validate(company),
         pages_parsed=parsed.pages_parsed,
+        chunks_indexed=chunks_indexed,
         errors=parsed.errors,
         research_duration_seconds=round(duration, 2),
+    )
+
+
+@router.get(
+    "/{domain}/context",
+    response_model=CompanyContextResponse,
+    summary="Semantic search over indexed site text",
+)
+async def company_context(
+    domain: str,
+    q: str = Query(..., min_length=2, max_length=500),
+    top_k: int = Query(default=5, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+) -> CompanyContextResponse:
+    """Retrieve the closest chunks for a query from the company Chroma collection."""
+    service = _service(db)
+    company = await service.get_by_domain(domain)
+    if company is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Company '{domain}' not found",
+        )
+    try:
+        hits = await service.rag.search(company.domain, q, top_k=top_k)
+    except Exception as exc:
+        logger.exception("RAG search failed for %s", domain)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"RAG search failed: {exc}",
+        ) from None
+    return CompanyContextResponse(
+        domain=company.domain,
+        query=q,
+        chunks=[
+            RAGChunk(
+                text=hit["text"],
+                score=hit.get("score"),
+                chunk_index=hit.get("chunk_index"),
+                metadata=hit.get("metadata") or {},
+            )
+            for hit in hits
+        ],
     )
 
 
