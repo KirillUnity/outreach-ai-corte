@@ -1,11 +1,13 @@
-"""Pydantic schemas for EmailDraft CRUD."""
+"""Pydantic schemas for EmailDraft CRUD and LLM generation."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import EmailGoal
+from app.schemas.company import CompanyResponse
 from app.schemas.person import PersonResponse
 
 
@@ -62,3 +64,31 @@ class EmailDraftListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class EmailGenerationRequest(BaseModel):
+    """Client-supplied sender identity + generation knobs."""
+
+    person_id: UUID
+    goal: EmailGoal = EmailGoal.MEETING
+    tone: Literal["professional", "casual", "friendly"] = "professional"
+    max_words: int = Field(default=120, ge=50, le=300)
+    language: Literal["en", "ru"] = "en"
+    sender_name: str = Field(..., min_length=1)
+    sender_title: str = Field(..., min_length=1)
+    sender_company: str = Field(..., min_length=1)
+    custom_instructions: str | None = None
+
+
+class EmailGenerationResponse(BaseModel):
+    """Generated draft plus RAG/cost metadata."""
+
+    draft: EmailDraftResponse
+    person: PersonResponse
+    company: CompanyResponse | None = None
+    rag_context_used: list[str] = []
+    tokens_input: int
+    tokens_output: int
+    estimated_cost_usd: float
+    model: str
+    generation_duration_seconds: float

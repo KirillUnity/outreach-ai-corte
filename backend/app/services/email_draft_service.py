@@ -1,6 +1,9 @@
-"""Email draft business logic (CRUD + mark-sent)."""
+"""Email draft business logic (CRUD + mark-sent + LLM generation)."""
+
+from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -9,16 +12,25 @@ from sqlalchemy.orm import selectinload
 
 from app.models.email_draft import EmailDraft
 from app.models.enums import EmailGoal
-from app.schemas.email_draft import EmailDraftCreate, EmailDraftUpdate
+from app.schemas.email_draft import EmailDraftCreate, EmailDraftUpdate, EmailGenerationRequest
+from app.services.email_generator import EmailGenerator
 from app.services.exceptions import NotFoundError
 from app.services.person_service import PersonService
+
+if TYPE_CHECKING:
+    from app.services.company_service import CompanyService
 
 
 class EmailDraftService:
     """CRUD operations for `EmailDraft` using an injected async session."""
 
-    def __init__(self, db: AsyncSession) -> None:
+    def __init__(
+        self,
+        db: AsyncSession,
+        email_generator: EmailGenerator | None = None,
+    ) -> None:
         self.db = db
+        self._email_generator = email_generator
 
     async def create(self, data: EmailDraftCreate) -> EmailDraft:
         """Insert a draft. Raises NotFoundError if person_id does not exist."""
@@ -113,3 +125,50 @@ class EmailDraftService:
         await self.db.commit()
         await self.db.refresh(draft)
         return draft
+
+    @property
+    def email_generator(self) -> EmailGenerator:
+        """Lazy default so tests can inject a fake generator."""
+        if self._email_generator is None:
+            self._email_generator = EmailGenerator()
+        return self._email_generator
+
+    async def generate_and_save(
+        self,
+        person_id: UUID,
+        request: EmailGenerationRequest,
+        person_service: PersonService,
+        company_service: CompanyService,
+    ) -> tuple[EmailDraft, dict[str, Any]]:
+        """Generate a draft via LLM, persist it, return (draft, metadata)."""
+        person = await person_service.get_by_id(person_id)
+        if person is None:
+            raise NotFoundError(f"Person {person_id} not found")
+
+        company = None
+        if person.company_id is not None:
+            company = await company_service.get_by_id(person.company_id)
+
+        meta = await self.email_generator.generate(person, company, request)
+        draft = EmailDraft(
+            person_id=person.id,
+            subject=meta["subject"],
+            body=meta["body"],
+            goal=request.goal,
+            generation_context={
+                "rag_context_used": meta.get("rag_context_used") or [],
+                "model": meta.get("model"),
+                "tokens_input": meta.get("tokens_input"),
+                "tokens_output": meta.get("tokens_output"),
+                "estimated_cost_usd": meta.get("estimated_cost_usd"),
+                "validation_errors": meta.get("validation_errors") or [],
+                "retried": meta.get("retried", False),
+                "sender_name": request.sender_name,
+                "sender_title": request.sender_title,
+                "sender_company": request.sender_company,
+            },
+        )
+        self.db.add(draft)
+        await self.db.commit()
+        await self.db.refresh(draft)
+        return draft, meta

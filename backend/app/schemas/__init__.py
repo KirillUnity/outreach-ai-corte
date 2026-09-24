@@ -21,6 +21,8 @@ from app.schemas.email_draft import (
     EmailDraftResponse,
     EmailDraftUpdate,
     EmailDraftWithPersonResponse,
+    EmailGenerationRequest,
+    EmailGenerationResponse,
 )
 from app.schemas.linkedin import (
     LinkedInProfile,
@@ -53,6 +55,8 @@ __all__ = [
     "EmailDraftResponse",
     "EmailDraftUpdate",
     "EmailDraftWithPersonResponse",
+    "EmailGenerationRequest",
+    "EmailGenerationResponse",
     "LinkedInProfile",
     "PersonCompanyAssign",
     "PersonCreate",

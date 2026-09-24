@@ -7,8 +7,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, get_linkedin_service
+from app.api.deps import get_db, get_email_generator, get_linkedin_service
 from app.schemas.company import CompanyResponse
+from app.schemas.email_draft import (
+    EmailDraftResponse,
+    EmailGenerationRequest,
+    EmailGenerationResponse,
+)
 from app.schemas.linkedin import PersonResearchRequest, PersonResearchResponse
 from app.schemas.person import (
     PersonCompanyAssign,
@@ -18,6 +23,9 @@ from app.schemas.person import (
     PersonUpdate,
     PersonWithCompanyResponse,
 )
+from app.services.company_service import CompanyService
+from app.services.email_draft_service import EmailDraftService
+from app.services.email_generator import EmailGenerator
 from app.services.exceptions import DuplicateError, NotFoundError
 from app.services.person_service import PersonService
 
@@ -192,3 +200,67 @@ async def assign_company(
             detail=f"Person '{person_id}' not found",
         )
     return PersonResponse.model_validate(person)
+
+
+@router.post(
+    "/{person_id}/generate-email",
+    response_model=EmailGenerationResponse,
+    summary="Generate a personalized outreach email",
+)
+async def generate_email_for_person(
+    person_id: UUID,
+    request: EmailGenerationRequest,
+    db: AsyncSession = Depends(get_db),
+    email_generator: EmailGenerator = Depends(get_email_generator),
+) -> EmailGenerationResponse:
+    """RAG context + LLM draft, then persist an EmailDraft. 404 / 400 / 502."""
+    if request.person_id != person_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="person_id mismatch",
+        )
+
+    person_service = PersonService(db)
+    company_service = CompanyService(db)
+    draft_service = EmailDraftService(db, email_generator=email_generator)
+
+    start = time.perf_counter()
+    try:
+        draft, meta = await draft_service.generate_and_save(
+            person_id=person_id,
+            request=request,
+            person_service=person_service,
+            company_service=company_service,
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.detail) from None
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from None
+    except Exception as exc:
+        logger.exception("Email generation failed for person %s", person_id)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Generation failed: {exc}",
+        ) from None
+
+    duration = time.perf_counter() - start
+    person = await person_service.get_by_id(person_id)
+    if person is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Person '{person_id}' not found",
+        )
+    company = (
+        await company_service.get_by_id(person.company_id) if person.company_id is not None else None
+    )
+    return EmailGenerationResponse(
+        draft=EmailDraftResponse.model_validate(draft),
+        person=PersonResponse.model_validate(person),
+        company=CompanyResponse.model_validate(company) if company is not None else None,
+        rag_context_used=list(meta.get("rag_context_used") or []),
+        tokens_input=int(meta.get("tokens_input") or 0),
+        tokens_output=int(meta.get("tokens_output") or 0),
+        estimated_cost_usd=float(meta.get("estimated_cost_usd") or 0.0),
+        model=str(meta.get("model") or ""),
+        generation_duration_seconds=round(duration, 2),
+    )

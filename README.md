@@ -26,7 +26,7 @@ Base URL: `http://localhost:8080/api/v1`
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | PostgreSQL + ChromaDB status |
+| GET | `/health` | PostgreSQL + ChromaDB + LLM config (no token spend) |
 
 ### Companies
 
@@ -68,6 +68,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X DELETE http://localhost:8080/api/v1/
 | DELETE | `/persons/{person_id}` | 204, 404 | Delete person (drafts CASCADE) |
 | POST | `/persons/{person_id}/company` | 200, 404 | Bind to an existing company |
 | POST | `/persons/research` | 200, 400, 404, 422, 502 | Enrich from LinkedIn URL (mock or Phantombuster) |
+| POST | `/persons/{person_id}/generate-email` | 200, 400, 404, 502 | RAG + LLM draft, save EmailDraft |
 
 ### Email drafts
 
@@ -167,6 +168,29 @@ LINKEDIN_PHANTOMBUSTER_PHANTOM_ID=your_agent_id
 ```
 
 We never scrape LinkedIn from this repo (ToS / legal). Design notes: [research/linkedin-mock-vs-real.md](research/linkedin-mock-vs-real.md).
+
+## Email generation
+
+`POST /api/v1/persons/{person_id}/generate-email` runs: **RAG retrieve → prompt → cloud LLM → validate → save EmailDraft**.
+
+Default `LLM_MODE=mock` returns a deterministic JSON draft so CI spends no tokens. `LLM_MODE=real` calls OpenAI or OpenRouter (`gpt-4o-mini` in dev, `gpt-4o` as `PREMIUM_MODEL`). Sender identity is passed per request, not stored as a user table.
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/persons/{person_id}/generate-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "person_id": "{person_id}",
+    "goal": "meeting",
+    "tone": "professional",
+    "max_words": 120,
+    "language": "en",
+    "sender_name": "Kirill",
+    "sender_title": "Founder",
+    "sender_company": "AI Cortex"
+  }'
+```
+
+Prompt notes: [research/llm-prompt-engineering-for-outreach.md](research/llm-prompt-engineering-for-outreach.md) · all templates: [PROMPTS.md](PROMPTS.md)
 
 ## Docs
 

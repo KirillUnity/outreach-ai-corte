@@ -29,5 +29,6 @@ class EmailGoal(str, Enum):
     INTRO = "intro"
     FOLLOW_UP = "follow_up"
     MEETING = "meeting"
+    DEMO = "demo"
     NURTURE = "nurture"
     BREAKUP = "breakup"
