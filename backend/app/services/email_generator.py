@@ -20,6 +20,7 @@ from app.services.prompts.email_prompts import (
     VALIDATION_RETRY_SUFFIX,
 )
 from app.services.rag_service import RAGService
+from app.services.tracing import TracingService, get_tracing
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +46,19 @@ class EmailGenerator:
         rag_service: RAGService | None = None,
         cost_tracker: CostTracker | None = None,
         validator: OutputValidator | None = None,
+        tracing: TracingService | None = None,
     ) -> None:
         self.settings = settings or default_settings
         self.cost_tracker = cost_tracker or CostTracker()
-        self.llm_client = llm_client or LLMClient(self.settings, cost_tracker=self.cost_tracker)
+        self.tracing = tracing if tracing is not None else get_tracing()
+        self.llm_client = llm_client or LLMClient(
+            self.settings, cost_tracker=self.cost_tracker, tracing=self.tracing
+        )
         self.rag_service = rag_service or RAGService(self.settings)
         self.validator = validator or OutputValidator()
+        from app.services.agent.scoring import QualityScorer
+
+        self.scorer = QualityScorer()
 
     async def generate(
         self,
@@ -87,6 +95,14 @@ class EmailGenerator:
             valid, errors = self.validator.validate_email(subject, body, request.max_words)
 
         record = self.cost_tracker.records[-1] if self.cost_tracker.records else None
+        scores = self.scorer.score_email(
+            subject,
+            body,
+            recipient_name=person.first_name or "",
+            company_name=company.name if company is not None else "",
+            draft_id=str(person.id),
+        )
+        self.tracing.log_scores(draft_id=str(person.id), scores=scores)
         return {
             "subject": subject[:200],
             "body": body,
@@ -97,6 +113,7 @@ class EmailGenerator:
             "model": result["model"],
             "validation_errors": [] if valid else errors,
             "retried": retried,
+            "quality_scores": scores,
         }
 
     async def _load_rag_chunks(

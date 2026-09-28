@@ -5,7 +5,7 @@ B2B outreach platform with AI agents. FastAPI + PostgreSQL + ChromaDB, all in Do
 ## Stack
 
 - Python 3.12, FastAPI, SQLAlchemy 2.0 (async), Alembic
-- PostgreSQL 16, ChromaDB
+- PostgreSQL 16, ChromaDB, Langfuse (self-hosted, optional keys)
 - Docker Compose (no Kubernetes)
 
 ## Quick start
@@ -248,7 +248,35 @@ curl -s "http://localhost:8080/api/v1/agent/runs?person_id={person_id}"
 
 Mermaid source: [docs/agent_graph.mmd](docs/agent_graph.mmd). Why LangGraph: [research/langgraph-vs-langchain-agents.md](research/langgraph-vs-langchain-agents.md). After `alembic upgrade head`, `agent_runs` stores `final_state` for debugging.
 
+## Observability with Langfuse
+
+Self-hosted UI: **http://localhost:3001** (mapped from container port 3000). Langfuse uses its **own** Postgres (`langfuse-db`), not the app database.
+
+What is traced:
+
+| Event | Where |
+|--------|--------|
+| LLM `chat()` | generation: system vs user inputs, output, tokens, `cost_usd`, latency |
+| Graph nodes | spans (`load_person` … `save_and_send`); `decide` adds `decision`, `decision_reason`, `validation_errors` |
+| Agent run | root trace `outreach_agent_{person_id}` + LangChain `CallbackHandler` |
+| Email quality | scores: `length_score`, `spam_score`, `personalization_score`, `cta_score` |
+
+Empty `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` → tracing is a **no-op** (API still starts). `LANGFUSE_SAMPLE_RATE=1.0` in dev; drop it (e.g. `0.1`) if the UI or ingest lags.
+
+```bash
+docker compose up -d langfuse-db langfuse
+# Open http://localhost:3001 → register admin → project "outreach-ai-cortex" → copy keys into .env
+docker compose up -d
+```
+
+Dashboard capture notes: [docs/langfuse-screenshots/README.md](docs/langfuse-screenshots/README.md). Why LLM observability: [research/langfuse-observability-for-llm.md](research/langfuse-observability-for-llm.md).
+
+RAM budget: `langfuse-db` 256m + `langfuse` 768m. Do not start Langfuse on a machine already near the 4 GB Compose cap if you do not need traces.
+
 ## Docs
 
 - Swagger UI: http://localhost:8080/docs
 - ReDoc: http://localhost:8080/redoc
+- Days 1–8 recap (self-check, diagrams, interview): [RU](research/days-1-8-summary.ru.md) · [EN](research/days-1-8-summary.en.md)
+- Days 1–5 only: [RU](research/days-1-5-summary.ru.md) · [EN](research/days-1-5-summary.en.md)
+- Langfuse observability: [research/langfuse-observability-for-llm.md](research/langfuse-observability-for-llm.md)

@@ -28,6 +28,7 @@ from app.services.email_generator import EmailGenerator
 from app.services.output_validator import OutputValidator
 from app.services.person_service import PersonService
 from app.services.rag_service import RAGService
+from app.services.tracing import TracingService
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +55,27 @@ def build_outreach_graph(
     settings: Settings,
     *,
     checkpointer: Any = None,
+    tracing: TracingService | None = None,
 ) -> Any:
     """Compile the graph. MemorySaver is the default so pytest needs no extra tables."""
     workflow: StateGraph = StateGraph(OutreachState)
+
+    def _wrap(node_name: str, fn):  # type: ignore[no-untyped-def]
+        async def _inner(state: OutreachState) -> dict:
+            if tracing is None:
+                return await fn(state)
+            with tracing.trace_node(node_name, dict(state)) as span:
+                result = await fn(state)
+                if node_name == "decide":
+                    span.set_metadata(
+                        decision=result.get("decision"),
+                        decision_reason=result.get("decision_reason"),
+                        validation_errors=state.get("validation_errors") or [],
+                    )
+                span.set_output(result)
+                return result
+
+        return _inner
 
     async def load_person(state: OutreachState) -> dict:
         return await load_person_and_company(state, person_service, company_service)
@@ -85,15 +104,15 @@ def build_outreach_graph(
     async def save_and_send(state: OutreachState) -> dict:
         return await save_and_send_node(state, draft_service)
 
-    workflow.add_node("load_person", load_person)
-    workflow.add_node("research_company", research_company)
-    workflow.add_node("retrieve_rag", retrieve_rag)
-    workflow.add_node("generate_email", generate_email)
-    workflow.add_node("validate_email", validate_email)
-    workflow.add_node("check_deliverability", check_deliverability)
-    workflow.add_node("decide", decide_node)
-    workflow.add_node("save_draft", save_draft)
-    workflow.add_node("save_and_send", save_and_send)
+    workflow.add_node("load_person", _wrap("load_person", load_person))
+    workflow.add_node("research_company", _wrap("research_company", research_company))
+    workflow.add_node("retrieve_rag", _wrap("retrieve_rag", retrieve_rag))
+    workflow.add_node("generate_email", _wrap("generate_email", generate_email))
+    workflow.add_node("validate_email", _wrap("validate_email", validate_email))
+    workflow.add_node("check_deliverability", _wrap("check_deliverability", check_deliverability))
+    workflow.add_node("decide", _wrap("decide", decide_node))
+    workflow.add_node("save_draft", _wrap("save_draft", save_draft))
+    workflow.add_node("save_and_send", _wrap("save_and_send", save_and_send))
 
     workflow.set_entry_point("load_person")
     workflow.add_conditional_edges(

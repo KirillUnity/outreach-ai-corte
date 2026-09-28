@@ -29,6 +29,7 @@ openai = "^1.59.0"
 langgraph = "^0.2.60"
 langgraph-checkpoint = "^2.0.0"
 langgraph-checkpoint-postgres = "^2.0.13"
+langfuse = ">=2.60.0,<3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"

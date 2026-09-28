@@ -70,6 +70,18 @@ class AgentSettings(BaseModel):
     sender_domain: str = ""
 
 
+class LangfuseSettings(BaseModel):
+    """Self-hosted Langfuse. Empty keys disable tracing (no-op), never crash the API."""
+
+    enabled: bool = True
+    public_key: str = ""
+    secret_key: str = ""
+    host: str = "http://langfuse:3000"
+    release: str = "outreach-ai-cortex@0.1.0"
+    environment: str = "development"
+    sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
 class LinkedInSettings(BaseModel):
     """LinkedIn enrichment: mock (default) or Phantombuster."""
 
@@ -108,6 +120,7 @@ class Settings(BaseSettings):
     rag: RAGSettings = Field(default_factory=RAGSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     agent: AgentSettings = Field(default_factory=AgentSettings)
+    langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
     # Convenience aliases so .env can use flat names from the Day 6/7 specs.
     phantombuster_api_key: str = ""
     openai_api_key: str = ""

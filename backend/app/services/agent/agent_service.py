@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.models.agent_run import AgentRun
+from app.services.agent.alerts import AlertsService
 from app.services.agent.graph import build_outreach_graph
 from app.services.agent.state import OutreachState
 from app.services.company_service import CompanyService
@@ -24,6 +25,7 @@ from app.services.llm_client import LLMClient
 from app.services.output_validator import OutputValidator
 from app.services.person_service import PersonService
 from app.services.rag_service import RAGService
+from app.services.tracing import TracingService, get_tracing
 
 logger = logging.getLogger(__name__)
 
@@ -76,18 +78,25 @@ def empty_outreach_state(
 class OutreachAgentService:
     """Build a per-request graph (services share this request's AsyncSession)."""
 
-    def __init__(self, db: AsyncSession, settings: Settings) -> None:
+    def __init__(
+        self,
+        db: AsyncSession,
+        settings: Settings,
+        tracing: TracingService | None = None,
+    ) -> None:
         self.db = db
         self.settings = settings
+        self.tracing = tracing if tracing is not None else get_tracing()
+        self.alerts = AlertsService()
 
     def _build_graph(self) -> Any:
         person_service = PersonService(self.db)
         company_service = CompanyService(self.db)
         rag_service = RAGService(self.settings)
         cost_tracker = CostTracker()
-        llm_client = LLMClient(self.settings, cost_tracker=cost_tracker)
+        llm_client = LLMClient(self.settings, cost_tracker=cost_tracker, tracing=self.tracing)
         email_generator = EmailGenerator(
-            self.settings, llm_client, rag_service, cost_tracker
+            self.settings, llm_client, rag_service, cost_tracker, tracing=self.tracing
         )
         validator = OutputValidator()
         deliverability_checker = DeliverabilityChecker(DomainHealthService(self.db))
@@ -101,6 +110,7 @@ class OutreachAgentService:
             deliverability_checker,
             draft_service,
             self.settings,
+            tracing=self.tracing,
         )
 
     async def run(
@@ -114,14 +124,41 @@ class OutreachAgentService:
         graph = self._build_graph()
         initial = empty_outreach_state(person_id, goal, sender_info, **kwargs)
         thread_id = f"{person_id}:{uuid4()}"
-        config = {
+        trace_id = self.tracing.start_trace(
+            name=f"outreach_agent_{person_id}",
+            metadata={"person_id": str(person_id), "goal": goal, "thread_id": thread_id},
+        )
+        token = self.tracing.bind_trace(trace_id)
+        handler = self.tracing.get_callback_handler(
+            trace_name=f"outreach_agent_{person_id}",
+            metadata={"person_id": str(person_id), "goal": goal},
+            session_id=str(person_id),
+        )
+        config: dict[str, Any] = {
             "configurable": {"thread_id": thread_id},
             "recursion_limit": max(8, self.settings.agent.max_iterations),
         }
+        if handler is not None:
+            config["callbacks"] = [handler]
         started = time.perf_counter()
-        result = await graph.ainvoke(initial, config=config)
-        duration = time.perf_counter() - started
+        try:
+            with self.tracing.trace_node("agent_run", {"person_id": str(person_id), "goal": goal}) as span:
+                result = await graph.ainvoke(initial, config=config)
+                span.set_output(
+                    {
+                        "decision": result.get("decision"),
+                        "decision_reason": result.get("decision_reason"),
+                        "draft_id": str(result.get("draft_id") or ""),
+                    }
+                )
+        finally:
+            duration = time.perf_counter() - started
+            self.tracing.flush()
+            self.tracing.unbind_trace(token)
         await self._persist_run(result, duration)
+        self.alerts.check_cost_threshold(float(result.get("total_cost_usd") or 0.0))
+        error_n = len(result.get("errors") or [])
+        self.alerts.check_error_rate(error_n, 1)
         return result
 
     async def list_runs(

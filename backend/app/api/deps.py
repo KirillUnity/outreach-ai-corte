@@ -12,6 +12,7 @@ from app.services.email_generator import EmailGenerator
 from app.services.linkedin_service import LinkedInService
 from app.services.llm_client import LLMClient
 from app.services.rag_service import RAGService
+from app.services.tracing import get_tracing
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -35,9 +36,11 @@ def get_email_generator() -> EmailGenerator:
     """Wire RAG + LLM + cost tracker for one request."""
     cfg = get_settings()
     tracker = CostTracker()
+    tracing = get_tracing()
     return EmailGenerator(
         settings=cfg,
-        llm_client=LLMClient(cfg, cost_tracker=tracker),
+        llm_client=LLMClient(cfg, cost_tracker=tracker, tracing=tracing),
         rag_service=RAGService(cfg),
         cost_tracker=tracker,
+        tracing=tracing,
     )

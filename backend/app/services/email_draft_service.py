@@ -16,6 +16,7 @@ from app.schemas.email_draft import EmailDraftCreate, EmailDraftUpdate, EmailGen
 from app.services.email_generator import EmailGenerator
 from app.services.exceptions import NotFoundError
 from app.services.person_service import PersonService
+from app.services.tracing import get_tracing
 
 if TYPE_CHECKING:
     from app.services.company_service import CompanyService
@@ -141,34 +142,48 @@ class EmailDraftService:
         company_service: CompanyService,
     ) -> tuple[EmailDraft, dict[str, Any]]:
         """Generate a draft via LLM, persist it, return (draft, metadata)."""
-        person = await person_service.get_by_id(person_id)
-        if person is None:
-            raise NotFoundError(f"Person {person_id} not found")
-
-        company = None
-        if person.company_id is not None:
-            company = await company_service.get_by_id(person.company_id)
-
-        meta = await self.email_generator.generate(person, company, request)
-        draft = EmailDraft(
-            person_id=person.id,
-            subject=meta["subject"],
-            body=meta["body"],
-            goal=request.goal,
-            generation_context={
-                "rag_context_used": meta.get("rag_context_used") or [],
-                "model": meta.get("model"),
-                "tokens_input": meta.get("tokens_input"),
-                "tokens_output": meta.get("tokens_output"),
-                "estimated_cost_usd": meta.get("estimated_cost_usd"),
-                "validation_errors": meta.get("validation_errors") or [],
-                "retried": meta.get("retried", False),
-                "sender_name": request.sender_name,
-                "sender_title": request.sender_title,
-                "sender_company": request.sender_company,
-            },
+        tracing = get_tracing()
+        trace_id = tracing.start_trace(
+            name=f"generate_email_{person_id}",
+            metadata={"person_id": str(person_id), "goal": getattr(request.goal, "value", request.goal)},
         )
-        self.db.add(draft)
-        await self.db.commit()
-        await self.db.refresh(draft)
-        return draft, meta
+        token = tracing.bind_trace(trace_id)
+        try:
+            person = await person_service.get_by_id(person_id)
+            if person is None:
+                raise NotFoundError(f"Person {person_id} not found")
+
+            company = None
+            if person.company_id is not None:
+                company = await company_service.get_by_id(person.company_id)
+
+            meta = await self.email_generator.generate(person, company, request)
+            draft = EmailDraft(
+                person_id=person.id,
+                subject=meta["subject"],
+                body=meta["body"],
+                goal=request.goal,
+                generation_context={
+                    "rag_context_used": meta.get("rag_context_used") or [],
+                    "model": meta.get("model"),
+                    "tokens_input": meta.get("tokens_input"),
+                    "tokens_output": meta.get("tokens_output"),
+                    "estimated_cost_usd": meta.get("estimated_cost_usd"),
+                    "validation_errors": meta.get("validation_errors") or [],
+                    "retried": meta.get("retried", False),
+                    "quality_scores": meta.get("quality_scores") or {},
+                    "sender_name": request.sender_name,
+                    "sender_title": request.sender_title,
+                    "sender_company": request.sender_company,
+                },
+            )
+            self.db.add(draft)
+            await self.db.commit()
+            await self.db.refresh(draft)
+            scores = meta.get("quality_scores") or {}
+            if scores:
+                tracing.log_scores(draft_id=str(draft.id), scores=scores)
+            return draft, meta
+        finally:
+            tracing.flush()
+            tracing.unbind_trace(token)

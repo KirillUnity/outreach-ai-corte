@@ -9,6 +9,7 @@ from sqlalchemy import text
 from app.api.routers import agent, companies, domain_health, email_drafts, health, persons
 from app.core.config import settings
 from app.core.database import engine
+from app.services.tracing import get_tracing
 
 
 @asynccontextmanager
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with engine.begin() as conn:
         await conn.execute(text("SELECT 1"))
     yield
+    get_tracing().flush()
     await engine.dispose()
 
 

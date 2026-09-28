@@ -12,6 +12,8 @@ services:
     ports:
       - "5432:5432"
     mem_limit: 512m
+    networks:
+      - outreach-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-outreach}"]
       interval: 5s
@@ -32,6 +34,8 @@ services:
     ports:
       - "8000:8000"
     mem_limit: 768m
+    networks:
+      - outreach-network
     healthcheck:
       test:
         [
@@ -54,6 +58,8 @@ services:
     ports:
       - "8080:8080"
     mem_limit: 512m
+    networks:
+      - outreach-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,6 +72,61 @@ services:
       retries: 3
       start_period: 25s
 
+  langfuse-db:
+    image: postgres:16-alpine
+    container_name: outreach-langfuse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse_db_data:/var/lib/postgresql/data
+    mem_limit: 256m
+    networks:
+      - outreach-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: outreach-langfuse
+    restart: unless-stopped
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    ports:
+      - "3001:3000"
+    mem_limit: 768m
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-change-me-in-production-please-32ch}
+      SALT: ${LANGFUSE_SALT:-change-me-too-please-use-32chars}
+      NEXTAUTH_URL: http://localhost:3001
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+    networks:
+      - outreach-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/api/public/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+
 volumes:
   postgres_data:
   chroma_data:
+  langfuse_db_data:
+
+networks:
+  outreach-network:
+    name: outreach-network
