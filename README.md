@@ -306,11 +306,23 @@ Investor-facing: **cost per run**, **send/hold/reject mix**, **personalization_s
 
 Bolt UI: **http://localhost:7474** (`bolt://localhost:7687`). Heap max **512m**, pagecache **256m**, container `mem_limit` **1024m**. Postgres remains CRUD source of truth; Neo4j is a path/index.
 
-Use cases:
+### Graph Use Cases
 
-- Shortest intro path between two people (`GET /api/v1/graph/path`)
-- Company org chart (`GET /api/v1/graph/company/{domain}/network?depth=2`)
-- Mutual connections into a target account (`GET /api/v1/graph/person/{id}/mutual-connections`)
+| Use case | Endpoint |
+| --- | --- |
+| Shortest intro path | `GET /api/v1/graph/path?from_person_id=&to_person_id=` |
+| Path into an account | `GET /api/v1/graph/person/{id}/path-to-company?company_domain=` |
+| Mutual connections (two people) | `GET /api/v1/graph/persons/mutual?person_a_id=&person_b_id=` |
+| Friends already at the account | `GET /api/v1/graph/person/{id}/mutual-connections?target_company_domain=` |
+| Influence score | `GET /api/v1/graph/person/{id}/influence` |
+| Org + neighbors | `GET /api/v1/graph/company/{domain}/network?depth=2` |
+| Decision-makers | `GET /api/v1/graph/company/{domain}/decision-makers` |
+| Recommended uncontacted targets | `GET /api/v1/graph/company/{domain}/recommended-targets` |
+| Competitors | `GET/POST /api/v1/graph/company/{domain}/competitors` |
+| Warm intro paths | `GET /api/v1/graph/person/{id}/warm-intro-paths?target_company_domain=` |
+| Graph stats / rankings | `GET /api/v1/graph/analytics/stats`, `.../top-influencers`, `.../company-rankings` |
+
+Capture a Browser screenshot (`MATCH (n) RETURN n LIMIT 25`) for interviews. Patterns: [research/graph-query-patterns.md](research/graph-query-patterns.md). Recipes: [docs/graph-recipes.md](docs/graph-recipes.md). Why Neo4j vs CTE: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md). Schema: `get_schema_description()` in `backend/app/services/graph/schema.py`.
 
 ```bash
 docker compose up -d neo4j
@@ -320,8 +332,6 @@ docker stats outreach-neo4j   # stay under ~1 GB
 ```
 
 `POST /api/v1/graph/sync` needs header `X-Admin-Token: $GRAPH_SYNC_TOKEN` (or `DEBUG=true` with empty token). `NEO4J_AUTO_SYNC_ON_WRITE=false` by default so CRUD tests do not open Bolt.
-
-Capture a Browser screenshot (`MATCH (n) RETURN n LIMIT 25`) for interviews. Why Neo4j vs CTE: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md). Schema: `get_schema_description()` in `backend/app/services/graph/schema.py`.
 
 ## Docs
 
@@ -333,4 +343,6 @@ Capture a Browser screenshot (`MATCH (n) RETURN n LIMIT 25`) for interviews. Why
 - Prompt catalog: [PROMPTS.md](PROMPTS.md)
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Days 1–10: [docs/DAY10_SUMMARY.md](docs/DAY10_SUMMARY.md)
+- Graph Cypher patterns: [research/graph-query-patterns.md](research/graph-query-patterns.md)
+- Graph recipes: [docs/graph-recipes.md](docs/graph-recipes.md)
 - Neo4j vs Postgres graph queries: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md)

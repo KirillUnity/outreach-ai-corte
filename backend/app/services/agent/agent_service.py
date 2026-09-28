@@ -59,6 +59,7 @@ def empty_outreach_state(
         "company_data": None,
         "company_researched": False,
         "rag_context": None,
+        "graph_context": None,
         "email_subject": None,
         "email_body": None,
         "deliverability_ok": None,
@@ -102,6 +103,20 @@ class OutreachAgentService:
         validator = OutputValidator()
         deliverability_checker = DeliverabilityChecker(DomainHealthService(self.db))
         draft_service = EmailDraftService(self.db, email_generator=email_generator)
+        connection_service = None
+        graph_service = None
+        try:
+            from app.services.neo4j_client import get_neo4j_client
+
+            neo4j = get_neo4j_client()
+            if neo4j.enabled:
+                from app.services.graph.connections import ConnectionService
+                from app.services.graph.graph_service import GraphService
+
+                graph_service = GraphService(neo4j)
+                connection_service = ConnectionService(graph_service, neo4j)
+        except Exception:
+            logger.exception("neo4j wiring skipped for outreach agent")
         return build_outreach_graph(
             person_service,
             company_service,
@@ -112,6 +127,8 @@ class OutreachAgentService:
             draft_service,
             self.settings,
             tracing=self.tracing,
+            graph_service=graph_service,
+            connection_service=connection_service,
         )
 
     async def run(

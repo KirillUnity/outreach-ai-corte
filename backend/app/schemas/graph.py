@@ -29,10 +29,44 @@ class PathResponse(BaseModel):
     distance: int
 
 
+class PathToCompanyResponse(BaseModel):
+    path: list[GraphNodeResponse]
+    distance: int
+    target: GraphNodeResponse | None = None
+
+
 class MutualConnectionResponse(BaseModel):
     person: GraphNodeResponse
     company: GraphNodeResponse
     connection_path_length: int
+
+
+class MutualConnectionsResponse(BaseModel):
+    persons: list[GraphNodeResponse]
+
+
+class InfluenceScoreResponse(BaseModel):
+    id: str | None = None
+    direct_connections: int
+    second_degree_connections: int
+    influence_score: float
+
+
+class CompetitorCreate(BaseModel):
+    competitor_domain: str
+
+
+class CompetitorsResponse(BaseModel):
+    competitors: list[dict] = Field(default_factory=list)
+
+
+class RecommendationResponse(BaseModel):
+    items: list[dict] = Field(default_factory=list)
+
+
+class GraphStatsResponse(BaseModel):
+    nodes: dict[str, int] = Field(default_factory=dict)
+    relationships: dict[str, int] = Field(default_factory=dict)
 
 
 class SyncResponse(BaseModel):

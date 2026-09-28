@@ -24,12 +24,12 @@ def _svc(client: _Fake) -> ConnectionService:
     return ConnectionService(GraphService(client), client)
 
 
-async def test_find_shortest_path_empty() -> None:
+async def test_find_shortest_path_no_path_returns_empty() -> None:
     out = await _svc(_Fake([])).find_shortest_path(uuid4(), uuid4())
-    assert out == []
+    assert out == {"path": [], "distance": -1}
 
 
-async def test_find_shortest_path_direct() -> None:
+async def test_find_shortest_path_returns_path() -> None:
     a, b = uuid4(), uuid4()
     rows = [
         {
@@ -41,8 +41,30 @@ async def test_find_shortest_path_direct() -> None:
         }
     ]
     out = await _svc(_Fake(rows)).find_shortest_path(a, b)
-    assert out[0]["distance"] == 1
-    assert len(out[0]["path"]) == 2
+    assert out["distance"] == 1
+    assert len(out["path"]) == 2
+
+
+async def test_mutual_connections_finds_common() -> None:
+    mutual_id = uuid4()
+    rows = [{"mutual": {"id": str(mutual_id), "first_name": "Grace"}}]
+    out = await _svc(_Fake(rows)).find_mutual_connections(uuid4(), uuid4())
+    assert out[0]["id"] == str(mutual_id)
+
+
+async def test_influence_score_calculation() -> None:
+    pid = uuid4()
+    rows = [
+        {
+            "id": str(pid),
+            "direct_connections": 2,
+            "second_degree_connections": 4,
+            "influence_score": 4.0,
+        }
+    ]
+    out = await _svc(_Fake(rows)).compute_influence_score(pid)
+    assert out["influence_score"] == 4.0
+    assert out["direct_connections"] == 2
 
 
 async def test_add_connection_bidirectional() -> None:

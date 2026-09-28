@@ -8,6 +8,7 @@ from uuid import UUID
 from app.models.company import Company
 from app.models.email_draft import EmailDraft
 from app.models.person import Person
+from app.services.graph import queries as cypher
 from app.services.neo4j_client import Neo4jClient
 
 UPSERT_COMPANY = """
@@ -133,3 +134,79 @@ class GraphService:
 
     async def delete_company(self, company_id: UUID) -> None:
         await self.client.execute_write(DELETE_COMPANY, {"id": str(company_id)})
+
+    async def get_company_network(self, domain: str, depth: int = 2, limit: int = 100) -> dict[str, Any]:
+        """Employees (depth 1) plus CONNECTED_TO neighbors (depth 2). Always LIMIT."""
+        rows = await self.client.execute_query(
+            cypher.QUERY_COMPANY_NETWORK, {"domain": domain, "limit": limit}
+        )
+        nodes: dict[str, dict[str, Any]] = {}
+        edges: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for row in rows:
+            company = row.get("company")
+            person = row.get("person")
+            if company and company.get("id"):
+                cid = str(company["id"])
+                nodes[cid] = {"id": cid, "label": "Company", **company}
+            if person and person.get("id") and company and company.get("id"):
+                pid = str(person["id"])
+                nodes[pid] = {"id": pid, "label": "Person", **person}
+                key = (pid, str(company["id"]), "WORKS_AT")
+                edges[key] = {"source": key[0], "target": key[1], "type": key[2]}
+        if depth >= 2:
+            extra = await self.client.execute_query(
+                cypher.QUERY_COMPANY_NETWORK_DEPTH2, {"domain": domain, "limit": limit}
+            )
+            for row in extra:
+                person = row.get("person") or {}
+                friend = row.get("friend") or {}
+                fc = row.get("friend_company") or {}
+                if person.get("id"):
+                    nodes[str(person["id"])] = {"id": str(person["id"]), "label": "Person", **person}
+                if friend.get("id") and person.get("id"):
+                    nodes[str(friend["id"])] = {"id": str(friend["id"]), "label": "Person", **friend}
+                    key = (str(person["id"]), str(friend["id"]), "CONNECTED_TO")
+                    edges[key] = {"source": key[0], "target": key[1], "type": key[2]}
+                if fc.get("id") and friend.get("id"):
+                    nodes[str(fc["id"])] = {"id": str(fc["id"]), "label": "Company", **fc}
+                    key = (str(friend["id"]), str(fc["id"]), "WORKS_AT")
+                    edges[key] = {"source": key[0], "target": key[1], "type": key[2]}
+        return {"nodes": list(nodes.values()), "edges": list(edges.values())}
+
+    async def get_person_network(self, person_id: UUID, depth: int = 2, limit: int = 100) -> dict[str, Any]:
+        _ = depth
+        rows = await self.client.execute_query(
+            cypher.QUERY_PERSON_NETWORK, {"person_id": str(person_id), "limit": limit}
+        )
+        nodes: dict[str, dict[str, Any]] = {}
+        edges: dict[tuple[str, str, str], dict[str, Any]] = {}
+        for row in rows:
+            person = row.get("person") or {}
+            company = row.get("company") or {}
+            other = row.get("other") or {}
+            thread = row.get("thread") or {}
+            if person.get("id"):
+                nodes[str(person["id"])] = {"id": str(person["id"]), "label": "Person", **person}
+            if company.get("id") and person.get("id"):
+                nodes[str(company["id"])] = {"id": str(company["id"]), "label": "Company", **company}
+                key = (str(person["id"]), str(company["id"]), "WORKS_AT")
+                edges[key] = {"source": key[0], "target": key[1], "type": key[2]}
+            if other.get("id") and person.get("id"):
+                nodes[str(other["id"])] = {"id": str(other["id"]), "label": "Person", **other}
+                key = (str(person["id"]), str(other["id"]), "CONNECTED_TO")
+                edges[key] = {"source": key[0], "target": key[1], "type": key[2]}
+            if thread.get("id") and person.get("id"):
+                nodes[str(thread["id"])] = {"id": str(thread["id"]), "label": "EmailThread", **thread}
+                key = (str(person["id"]), str(thread["id"]), "PARTICIPATES_IN")
+                edges[key] = {"source": key[0], "target": key[1], "type": key[2]}
+        return {"nodes": list(nodes.values()), "edges": list(edges.values())}
+
+    async def get_top_decision_makers(self, domain: str, limit: int = 10) -> list[dict[str, Any]]:
+        return await self.client.execute_query(
+            cypher.QUERY_DECISION_MAKERS_AT_COMPANY, {"domain": domain, "limit": limit}
+        )
+
+    async def get_recommended_targets(self, domain: str, limit: int = 10) -> list[dict[str, Any]]:
+        return await self.client.execute_query(
+            cypher.QUERY_RECOMMEND_OUTREACH_TARGETS, {"domain": domain, "limit": limit}
+        )

@@ -12,6 +12,7 @@ from app.services.agent.edges import route_after_decide, route_after_load, route
 from app.services.agent.nodes import (
     check_deliverability_node,
     decide,
+    enrich_with_graph,
     generate_email_node,
     load_person_and_company,
     research_company_if_needed,
@@ -58,6 +59,8 @@ def build_outreach_graph(
     checkpointer: Any = None,
     tracing: TracingService | None = None,
     guardrail_pipeline: GuardrailPipeline | None = None,
+    graph_service: Any = None,
+    connection_service: Any = None,
 ) -> Any:
     """Compile the graph. MemorySaver is the default so pytest needs no extra tables."""
     workflow: StateGraph = StateGraph(OutreachState)
@@ -88,6 +91,9 @@ def build_outreach_graph(
     async def retrieve_rag(state: OutreachState) -> dict:
         return await retrieve_rag_context(state, rag_service, email_generator)
 
+    async def enrich_graph(state: OutreachState) -> dict:
+        return await enrich_with_graph(state, graph_service, connection_service)
+
     async def generate_email(state: OutreachState) -> dict:
         return await generate_email_node(state, email_generator, person_service, company_service)
 
@@ -111,6 +117,7 @@ def build_outreach_graph(
     workflow.add_node("load_person", _wrap("load_person", load_person))
     workflow.add_node("research_company", _wrap("research_company", research_company))
     workflow.add_node("retrieve_rag", _wrap("retrieve_rag", retrieve_rag))
+    workflow.add_node("enrich_with_graph", _wrap("enrich_with_graph", enrich_graph))
     workflow.add_node("generate_email", _wrap("generate_email", generate_email))
     workflow.add_node("validate_email", _wrap("validate_email", validate_email))
     workflow.add_node("check_deliverability", _wrap("check_deliverability", check_deliverability))
@@ -125,7 +132,8 @@ def build_outreach_graph(
         {"research_company": "research_company", "fail": END},
     )
     workflow.add_edge("research_company", "retrieve_rag")
-    workflow.add_edge("retrieve_rag", "generate_email")
+    workflow.add_edge("retrieve_rag", "enrich_with_graph")
+    workflow.add_edge("enrich_with_graph", "generate_email")
     workflow.add_edge("generate_email", "validate_email")
     workflow.add_conditional_edges(
         "validate_email",

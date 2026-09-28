@@ -24,7 +24,7 @@ flowchart LR
 | **API** | Thin routers under `/api/v1` — companies, persons, drafts, deliverability, agent, analytics, **graph**, health |
 | **Services** | Site parser, LinkedIn, RAG, `LLMClient`, `EmailGenerator`, `TracingService`, `AnalyticsService`, `GraphService` |
 | **Models** | SQLAlchemy 2.0 async: Company, Person, EmailDraft, DomainHealth, AgentRun |
-| **Agent** | `OutreachState` → 9 nodes, conditional edges, in-process checkpointer by default |
+| **Agent** | `OutreachState` → 10 nodes (incl. `enrich_with_graph`), conditional edges, in-process checkpointer by default |
 | **Guardrails** | Hallucination (heuristic NER), content policy, PII regex, structure — parallel `asyncio.gather` |
 | **Observability** | Langfuse traces/spans/generations/scores; `CostTracker`; analytics SQL |
 

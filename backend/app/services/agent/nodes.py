@@ -17,6 +17,8 @@ from app.services.email_generator import EmailGenerator
 from app.services.guardrails.pipeline import GuardrailPipeline, build_default_pipeline, results_as_dicts
 from app.services.output_validator import OutputValidator
 from app.services.person_service import PersonService
+from app.services.graph.connections import ConnectionService
+from app.services.graph.graph_service import GraphService
 from app.services.rag_service import RAGService
 
 logger = logging.getLogger(__name__)
@@ -124,6 +126,44 @@ async def retrieve_rag_context(
     return {"rag_context": [str(hit.get("text") or "") for hit in hits if hit.get("text")]}
 
 
+async def enrich_with_graph(
+    state: OutreachState,
+    graph_service: GraphService | None = None,
+    connection_service: ConnectionService | None = None,
+) -> dict[str, Any]:
+    """Warm intro + influence are optional context — missing Neo4j never blocks generate."""
+    _ = graph_service
+    person_id = state["person_id"]
+    company_data = state.get("company_data") or {}
+    company_domain = company_data.get("domain")
+    logger.info("node=enrich_with_graph domain=%s", company_domain)
+    if connection_service is None or not company_domain:
+        return {"graph_context": {}}
+
+    try:
+        paths = await connection_service.find_connection_path_to_company(
+            person_id=person_id,
+            target_company_domain=str(company_domain),
+            max_depth=4,
+        )
+        influence = await connection_service.compute_influence_score(person_id)
+    except Exception as exc:
+        logger.exception("node=enrich_with_graph failed")
+        return {"graph_context": {}, "errors": [f"graph enrich failed: {exc}"]}
+
+    hops = paths.get("path") or []
+    names = ", ".join(str(hop.get("name") or "").strip() for hop in hops if hop.get("name"))
+    return {
+        "graph_context": {
+            "warm_intro_available": len(hops) > 0 and int(paths.get("distance") or -1) >= 0,
+            "warm_intro_distance": paths.get("distance", -1),
+            "warm_intro_names": names.strip(" ,"),
+            "influence_score": influence.get("influence_score", 0),
+            "path": hops,
+        }
+    }
+
+
 async def generate_email_node(
     state: OutreachState,
     email_generator: EmailGenerator,
@@ -141,6 +181,14 @@ async def generate_email_node(
     if person.company_id is not None:
         company = await company_service.get_by_id(person.company_id)
 
+    graph_ctx = state.get("graph_context") or {}
+    custom = None
+    if graph_ctx.get("warm_intro_available"):
+        names = graph_ctx.get("warm_intro_names") or "a mutual connection"
+        custom = (
+            f"P.S. I noticed we have a mutual connection — {names}. "
+            "Would you be open to a quick intro?"
+        )
     request = EmailGenerationRequest(
         person_id=state["person_id"],
         goal=_goal(state["goal"]),
@@ -149,6 +197,7 @@ async def generate_email_node(
         sender_company=state["sender_company"],
         language="ru" if state.get("language") == "ru" else "en",
         max_words=state.get("max_words") or 120,
+        custom_instructions=custom,
     )
     try:
         result = await email_generator.generate(person, company, request)
@@ -260,6 +309,7 @@ async def save_draft_node(state: OutreachState, draft_service: EmailDraftService
                 "tokens_output": state.get("total_tokens_output"),
                 "estimated_cost_usd": state.get("total_cost_usd"),
                 "iteration": state.get("iteration"),
+                "graph_context": state.get("graph_context") or {},
             },
             guardrail_results=state.get("guardrail_results") or [],
         )

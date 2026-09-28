@@ -22,6 +22,7 @@ class OutreachState(TypedDict):
     company_data: NotRequired[dict | None]
     company_researched: NotRequired[bool]
     rag_context: NotRequired[list[str] | None]
+    graph_context: NotRequired[dict | None]
     email_subject: NotRequired[str | None]
     email_body: NotRequired[str | None]
     deliverability_ok: NotRequired[bool | None]
