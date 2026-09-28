@@ -263,4 +263,6 @@ async def generate_email_for_person(
         estimated_cost_usd=float(meta.get("estimated_cost_usd") or 0.0),
         model=str(meta.get("model") or ""),
         generation_duration_seconds=round(duration, 2),
+        guardrail_results=meta.get("guardrail_results"),
+        decision=meta.get("decision"),
     )

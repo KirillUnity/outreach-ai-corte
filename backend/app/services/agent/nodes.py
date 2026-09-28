@@ -14,6 +14,7 @@ from app.services.company_service import CompanyService
 from app.services.deliverability_checker import DeliverabilityChecker, infer_sender_domain
 from app.services.email_draft_service import EmailDraftService
 from app.services.email_generator import EmailGenerator
+from app.services.guardrails.pipeline import GuardrailPipeline, build_default_pipeline, results_as_dicts
 from app.services.output_validator import OutputValidator
 from app.services.person_service import PersonService
 from app.services.rag_service import RAGService
@@ -169,14 +170,30 @@ async def generate_email_node(
     }
 
 
-async def validate_email_node(state: OutreachState, validator: OutputValidator) -> dict[str, Any]:
-    """Run OutputValidator. Reducer appends; we send the new errors only."""
+async def validate_email_node(
+    state: OutreachState,
+    validator: OutputValidator,
+    pipeline: GuardrailPipeline | None = None,
+) -> dict[str, Any]:
+    """OutputValidator plus heuristic guardrails. Guardrail errors do not raise."""
     subject = state.get("email_subject") or ""
     body = state.get("email_body") or ""
     max_words = int(state.get("max_words") or 120)
     _ok, errors = validator.validate_email(subject, body, max_words)
-    logger.info("node=validate_email errors=%s", errors)
-    return {"validation_errors": errors}
+    rails = pipeline or build_default_pipeline()
+    context = {
+        "person": state.get("person_data") or {},
+        "company": state.get("company_data") or {},
+        "rag_context": state.get("rag_context") or [],
+        "sender_name": state.get("sender_name"),
+        "sender_title": state.get("sender_title"),
+        "sender_company": state.get("sender_company"),
+        "sender_email": "",
+    }
+    _passed, results = await rails.run_all(f"{subject}\n{body}", context)
+    serialized = results_as_dicts(results)
+    logger.info("node=validate_email errors=%s guardrails=%s", errors, serialized)
+    return {"validation_errors": errors, "guardrail_results": serialized}
 
 
 async def check_deliverability_node(
@@ -199,7 +216,17 @@ async def check_deliverability_node(
 
 def decide(state: OutreachState, settings: Settings) -> dict[str, Any]:
     """Deterministic policy — no LLM here."""
-    if state.get("validation_errors"):
+    blockers = [
+        row
+        for row in (state.get("guardrail_results") or [])
+        if isinstance(row, dict)
+        and not row.get("passed")
+        and row.get("severity") in {"error", "critical"}
+    ]
+    if blockers:
+        reasons = "; ".join(str(row.get("reason") or row.get("name")) for row in blockers)
+        decision, reason = "reject", f"guardrails failed: {reasons}"
+    elif state.get("validation_errors"):
         decision, reason = "reject", "validation failed"
     elif settings.agent.require_deliverability_check and not state.get("deliverability_ok"):
         decision, reason = "hold", "deliverability issues"
@@ -227,19 +254,21 @@ async def save_draft_node(state: OutreachState, draft_service: EmailDraftService
                 "decision_reason": state.get("decision_reason"),
                 "rag_context_used": state.get("rag_context") or [],
                 "validation_errors": state.get("validation_errors") or [],
+                "guardrail_results": state.get("guardrail_results") or [],
                 "deliverability": state.get("deliverability_details"),
                 "tokens_input": state.get("total_tokens_input"),
                 "tokens_output": state.get("total_tokens_output"),
                 "estimated_cost_usd": state.get("total_cost_usd"),
                 "iteration": state.get("iteration"),
             },
+            guardrail_results=state.get("guardrail_results") or [],
         )
     )
     return {"draft_id": draft.id}
 
 
 async def save_and_send_node(state: OutreachState, draft_service: EmailDraftService) -> dict[str, Any]:
-    """Save, then stub-mark sent. Real SMTP lands in Day 10."""
+    """Save, then stub-mark sent. Real SMTP is a later milestone."""
     update = await save_draft_node(state, draft_service)
     draft_id: UUID | None = update.get("draft_id")
     if draft_id is not None:

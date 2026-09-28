@@ -40,3 +40,8 @@ VALIDATION_RETRY_SUFFIX = (
     "The previous draft failed validation: {errors}. "
     "Rewrite subject and body so they pass. Still return only JSON."
 )
+
+GUARDRAIL_RETRY_SUFFIX = (
+    "Previous attempt failed guardrails: {reasons}. Please fix those issues. "
+    "Do not invent companies, people, or phone numbers. Still return only JSON."
+)

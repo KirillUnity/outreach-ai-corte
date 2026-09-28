@@ -11,10 +11,13 @@ from app.models.company import Company
 from app.models.enums import EmailGoal
 from app.models.person import Person
 from app.schemas.email_draft import EmailGenerationRequest
+from app.services.prompt_ab import PromptABTester, default_prompt_ab, suffix_for
 from app.services.cost_tracker import CostTracker
+from app.services.guardrails.pipeline import GuardrailPipeline, build_default_pipeline, results_as_dicts
 from app.services.llm_client import LLMClient
 from app.services.output_validator import SPAM_WORDS, OutputValidator
 from app.services.prompts.email_prompts import (
+    GUARDRAIL_RETRY_SUFFIX,
     SYSTEM_PROMPT_OUTREACH,
     USER_PROMPT_TEMPLATE,
     VALIDATION_RETRY_SUFFIX,
@@ -47,6 +50,8 @@ class EmailGenerator:
         cost_tracker: CostTracker | None = None,
         validator: OutputValidator | None = None,
         tracing: TracingService | None = None,
+        guardrail_pipeline: GuardrailPipeline | None = None,
+        ab_tester: PromptABTester | None = None,
     ) -> None:
         self.settings = settings or default_settings
         self.cost_tracker = cost_tracker or CostTracker()
@@ -59,6 +64,13 @@ class EmailGenerator:
         from app.services.agent.scoring import QualityScorer
 
         self.scorer = QualityScorer()
+        self.guardrail_pipeline = guardrail_pipeline or build_default_pipeline()
+        if ab_tester is not None:
+            self.ab_tester = ab_tester
+        elif self.settings.prompt_ab.enabled:
+            self.ab_tester = default_prompt_ab()
+        else:
+            self.ab_tester = None
 
     async def generate(
         self,
@@ -77,9 +89,14 @@ class EmailGenerator:
             max_words=request.max_words,
             language=request.language,
         )
+        variant = "v1_default"
+        if self.ab_tester is not None:
+            variant = self.ab_tester.pick_variant()
+            system = system + suffix_for(variant)
+        extra_meta = {"prompt_variant": variant}
         user = self._render_user_prompt(person, company, request, rag_context)
 
-        result = await self.llm_client.chat_json(system, user)
+        result = await self.llm_client.chat_json(system, user, extra_metadata=extra_meta)
         subject, body = self._extract_email(result["parsed"])
         valid, errors = self.validator.validate_email(subject, body, request.max_words)
         retried = False
@@ -90,9 +107,28 @@ class EmailGenerator:
                 + VALIDATION_RETRY_SUFFIX.format(errors="; ".join(errors) or "spam trigger words")
             )
             logger.info("email regen person=%s errors=%s", person.id, errors)
-            result = await self.llm_client.chat_json(system, retry_user)
+            result = await self.llm_client.chat_json(system, retry_user, extra_metadata=extra_meta)
             subject, body = self._extract_email(result["parsed"])
             valid, errors = self.validator.validate_email(subject, body, request.max_words)
+
+        guard_ctx = self._guardrail_context(person, company, rag_context, request)
+        passed, rail_results = await self.guardrail_pipeline.run_all(
+            f"{subject}\n{body}", guard_ctx
+        )
+        if not passed:
+            reasons = [r.reason or r.name for r in self.guardrail_pipeline.get_blockers(rail_results)]
+            logger.warning("guardrails blocked person=%s reasons=%s", person.id, reasons)
+            retried = True
+            retry_user = (
+                f"{user}\n\n"
+                + GUARDRAIL_RETRY_SUFFIX.format(reasons="; ".join(reasons) or "policy")
+            )
+            result = await self.llm_client.chat_json(system, retry_user, extra_metadata=extra_meta)
+            subject, body = self._extract_email(result["parsed"])
+            valid, errors = self.validator.validate_email(subject, body, request.max_words)
+            passed, rail_results = await self.guardrail_pipeline.run_all(
+                f"{subject}\n{body}", guard_ctx
+            )
 
         record = self.cost_tracker.records[-1] if self.cost_tracker.records else None
         scores = self.scorer.score_email(
@@ -103,6 +139,11 @@ class EmailGenerator:
             draft_id=str(person.id),
         )
         self.tracing.log_scores(draft_id=str(person.id), scores=scores)
+        if self.ab_tester is not None:
+            personal = float(scores.get("personalization_score") or 0.0)
+            self.ab_tester.log_result(variant, success=passed, score=personal)
+
+        decision = "reject" if not passed else None
         return {
             "subject": subject[:200],
             "body": body,
@@ -114,6 +155,35 @@ class EmailGenerator:
             "validation_errors": [] if valid else errors,
             "retried": retried,
             "quality_scores": scores,
+            "guardrail_results": results_as_dicts(rail_results),
+            "guardrails_passed": passed,
+            "decision": decision,
+            "prompt_variant": variant,
+        }
+
+    def _guardrail_context(
+        self,
+        person: Person,
+        company: Company | None,
+        rag_context: str,
+        request: EmailGenerationRequest,
+    ) -> dict[str, Any]:
+        return {
+            "person": {
+                "first_name": person.first_name,
+                "last_name": person.last_name,
+                "title": person.title,
+                "email": person.email,
+            },
+            "company": {
+                "name": company.name if company is not None else "",
+                "domain": company.domain if company is not None else "",
+            },
+            "rag_context": rag_context,
+            "sender_name": request.sender_name,
+            "sender_title": request.sender_title,
+            "sender_company": request.sender_company,
+            "sender_email": "",
         }
 
     async def _load_rag_chunks(

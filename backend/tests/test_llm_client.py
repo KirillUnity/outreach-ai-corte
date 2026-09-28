@@ -57,10 +57,10 @@ async def test_chat_retries_on_rate_limit(monkeypatch: pytest.MonkeyPatch) -> No
         contents=['{"subject":"Hi","body":"Hello after retry"}'],
         errors=[RuntimeError("rate")],
     )
-    monkeypatch.setattr(LLMClient, "_is_retryable", staticmethod(lambda _exc: True))
     client = _client(completions)
+    monkeypatch.setattr(client.retry_policy, "is_retryable", lambda _exc: True)
     result = await client.chat("sys", "user")
-    assert "retry" in result["content"] or result["content"]
+    assert result["content"]
     assert completions.calls == 2
 
 

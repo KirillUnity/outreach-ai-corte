@@ -1,7 +1,7 @@
 """Email draft ORM model."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
@@ -34,6 +34,7 @@ class EmailDraft(UUIDMixin, TimestampMixin, Base):
         nullable=False,
     )
     generation_context: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    guardrail_results: Mapped[Any | None] = mapped_column(JSONB, nullable=True)
     is_sent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

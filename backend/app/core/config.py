@@ -82,6 +82,12 @@ class LangfuseSettings(BaseModel):
     sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
+class PromptABSettings(BaseModel):
+    """In-process prompt A/B. Off by default so CI stays deterministic."""
+
+    enabled: bool = False
+
+
 class LinkedInSettings(BaseModel):
     """LinkedIn enrichment: mock (default) or Phantombuster."""
 
@@ -121,6 +127,7 @@ class Settings(BaseSettings):
     llm: LLMSettings = Field(default_factory=LLMSettings)
     agent: AgentSettings = Field(default_factory=AgentSettings)
     langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
+    prompt_ab: PromptABSettings = Field(default_factory=PromptABSettings)
     # Convenience aliases so .env can use flat names from the Day 6/7 specs.
     phantombuster_api_key: str = ""
     openai_api_key: str = ""

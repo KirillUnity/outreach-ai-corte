@@ -25,6 +25,7 @@ from app.services.company_service import CompanyService
 from app.services.deliverability_checker import DeliverabilityChecker
 from app.services.email_draft_service import EmailDraftService
 from app.services.email_generator import EmailGenerator
+from app.services.guardrails.pipeline import GuardrailPipeline, build_default_pipeline
 from app.services.output_validator import OutputValidator
 from app.services.person_service import PersonService
 from app.services.rag_service import RAGService
@@ -56,6 +57,7 @@ def build_outreach_graph(
     *,
     checkpointer: Any = None,
     tracing: TracingService | None = None,
+    guardrail_pipeline: GuardrailPipeline | None = None,
 ) -> Any:
     """Compile the graph. MemorySaver is the default so pytest needs no extra tables."""
     workflow: StateGraph = StateGraph(OutreachState)
@@ -89,8 +91,10 @@ def build_outreach_graph(
     async def generate_email(state: OutreachState) -> dict:
         return await generate_email_node(state, email_generator, person_service, company_service)
 
+    rails = guardrail_pipeline or build_default_pipeline()
+
     async def validate_email(state: OutreachState) -> dict:
-        return await validate_email_node(state, validator)
+        return await validate_email_node(state, validator, rails)
 
     async def check_deliverability(state: OutreachState) -> dict:
         return await check_deliverability_node(state, deliverability_checker, settings)

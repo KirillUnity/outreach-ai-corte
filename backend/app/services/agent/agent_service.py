@@ -64,6 +64,7 @@ def empty_outreach_state(
         "deliverability_ok": None,
         "deliverability_details": None,
         "validation_errors": [],
+        "guardrail_results": [],
         "draft_id": None,
         "decision": None,
         "decision_reason": None,

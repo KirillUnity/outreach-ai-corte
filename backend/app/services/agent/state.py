@@ -28,6 +28,8 @@ class OutreachState(TypedDict):
     deliverability_details: NotRequired[dict | None]
     # Overwrite (not `add`): a successful regen must clear the previous failures.
     validation_errors: NotRequired[list[str]]
+    # Overwrite: same reason as validation_errors — do not accumulate stale blockers.
+    guardrail_results: NotRequired[list[dict]]
 
     draft_id: NotRequired[UUID | None]
     decision: NotRequired[str | None]

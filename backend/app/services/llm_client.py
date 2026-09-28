@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
@@ -11,6 +10,7 @@ from typing import Any
 
 from app.core.config import Settings, settings as default_settings
 from app.services.cost_tracker import CostTracker
+from app.services.retry_policy import RetryPolicy
 from app.services.tracing import TracingService, get_tracing
 
 logger = logging.getLogger(__name__)
@@ -27,12 +27,19 @@ class LLMClient:
         cost_tracker: CostTracker | None = None,
         client: Any = None,
         tracing: TracingService | None = None,
+        retry_policy: RetryPolicy | None = None,
         backoff_seconds: float = 1.0,
         max_attempts: int = 4,
     ) -> None:
         self.settings = settings or default_settings
         self.cost_tracker = cost_tracker or CostTracker()
         self.tracing = tracing if tracing is not None else get_tracing()
+        self.retry_policy = retry_policy or RetryPolicy(
+            max_attempts=max_attempts,
+            base_delay=backoff_seconds,
+            max_delay=30.0,
+            jitter=backoff_seconds > 0,
+        )
         self.backoff_seconds = backoff_seconds
         self.max_attempts = max_attempts
         self._client = client
@@ -64,6 +71,7 @@ class LLMClient:
         temperature: float | None = None,
         max_tokens: int | None = None,
         response_format: dict[str, str] | None = None,
+        extra_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Return content + token usage. Retries rate limits / timeouts with backoff."""
         llm = self.settings.llm
@@ -72,53 +80,47 @@ class LLMClient:
         tokens = llm.max_tokens if max_tokens is None else max_tokens
 
         if llm.mode == "mock" and self._client is None:
-            return await self._chat_traced(system, user, chosen_model, lambda: self._mock_chat(system, user, chosen_model))
+            return await self._chat_traced(
+                system,
+                user,
+                chosen_model,
+                lambda: self._mock_chat(system, user, chosen_model),
+                extra_metadata=extra_metadata,
+            )
 
         async def _call() -> dict[str, Any]:
-            last_error: Exception | None = None
-            for attempt in range(self.max_attempts):
-                try:
-                    kwargs: dict[str, Any] = {
-                        "model": chosen_model,
-                        "temperature": temp,
-                        "max_tokens": tokens,
-                        "messages": [
-                            {"role": "system", "content": system},
-                            {"role": "user", "content": user},
-                        ],
-                    }
-                    if response_format is not None:
-                        kwargs["response_format"] = response_format
-                    completion = await self._client.chat.completions.create(**kwargs)
-                    choice = completion.choices[0]
-                    content = (choice.message.content or "").strip()
-                    usage = completion.usage
-                    tokens_input = int(getattr(usage, "prompt_tokens", 0) or 0)
-                    tokens_output = int(getattr(usage, "completion_tokens", 0) or 0)
-                    used_model = getattr(completion, "model", None) or chosen_model
-                    self.cost_tracker.log_chat(used_model, tokens_input, tokens_output)
-                    return {
-                        "content": content,
-                        "tokens_input": tokens_input,
-                        "tokens_output": tokens_output,
-                        "model": used_model,
-                    }
-                except Exception as exc:
-                    if not self._is_retryable(exc) or attempt == self.max_attempts - 1:
-                        raise
-                    last_error = exc
-                    delay = self.backoff_seconds * (2**attempt)
-                    logger.warning(
-                        "llm retry attempt=%s delay=%s error=%s",
-                        attempt + 1,
-                        delay,
-                        exc,
-                    )
-                    if delay:
-                        await asyncio.sleep(delay)
-            raise last_error or RuntimeError("LLM chat failed")
+            async def _once() -> dict[str, Any]:
+                kwargs: dict[str, Any] = {
+                    "model": chosen_model,
+                    "temperature": temp,
+                    "max_tokens": tokens,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                }
+                if response_format is not None:
+                    kwargs["response_format"] = response_format
+                completion = await self._client.chat.completions.create(**kwargs)
+                choice = completion.choices[0]
+                content = (choice.message.content or "").strip()
+                usage = completion.usage
+                tokens_input = int(getattr(usage, "prompt_tokens", 0) or 0)
+                tokens_output = int(getattr(usage, "completion_tokens", 0) or 0)
+                used_model = getattr(completion, "model", None) or chosen_model
+                self.cost_tracker.log_chat(used_model, tokens_input, tokens_output)
+                return {
+                    "content": content,
+                    "tokens_input": tokens_input,
+                    "tokens_output": tokens_output,
+                    "model": used_model,
+                }
 
-        return await self._chat_traced(system, user, chosen_model, _call)
+            return await self.retry_policy.execute(_once)
+
+        return await self._chat_traced(
+            system, user, chosen_model, _call, extra_metadata=extra_metadata
+        )
 
     async def chat_json(
         self,
@@ -142,6 +144,7 @@ class LLMClient:
         user: str,
         model: str,
         producer: Any,
+        extra_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Keep system vs user as separate fields so prompt diffs are obvious in Langfuse."""
         started = time.perf_counter()
@@ -158,6 +161,9 @@ class LLMClient:
                 cost = 0.0
                 if self.cost_tracker.records:
                     cost = self.cost_tracker.records[-1].estimated_cost_usd
+                meta = {"cost_usd": cost, "duration_ms": round(duration_ms, 2)}
+                if extra_metadata:
+                    meta.update(extra_metadata)
                 gen.update(
                     output=result.get("content"),
                     usage={
@@ -166,7 +172,7 @@ class LLMClient:
                         "total": int(result.get("tokens_input") or 0)
                         + int(result.get("tokens_output") or 0),
                     },
-                    metadata={"cost_usd": cost, "duration_ms": round(duration_ms, 2)},
+                    metadata=meta,
                 )
                 return result
             except Exception as exc:

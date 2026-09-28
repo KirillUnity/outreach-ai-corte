@@ -273,6 +273,35 @@ Dashboard capture notes: [docs/langfuse-screenshots/README.md](docs/langfuse-scr
 
 RAM budget: `langfuse-db` 256m + `langfuse` 768m. Do not start Langfuse on a machine already near the 4 GB Compose cap if you do not need traces.
 
+## Guardrails
+
+Outbound copy is checked **after** generation, in parallel (`GuardrailPipeline`):
+
+| Rail | Blocks send? |
+|------|----------------|
+| Hallucination (capitalized tokens vs RAG/person/company) | error if **>3** unknown entities; 1–2 is a warning |
+| Content policy (abuse, politics, spam phrasing, URL shorteners) | **critical** abuse terms only |
+| PII (phone, extra email, PAN-like digits, US SSN) | error; sender email in `context` is allowed |
+| Structure (greeting, CTA, placeholders, length) | missing CTA / leftover `{placeholders}` |
+
+Warnings never set `all_passed=False`. The agent `decide` node rejects on error/critical. One LLM retry with `GUARDRAIL_RETRY_SUFFIX` happens in `EmailGenerator` before giving up.
+
+JSON: `email_drafts.guardrail_results`. Apply `f1a2b3c4d5e6` (`alembic upgrade head`).
+
+## Analytics
+
+Read-only SQL under `/api/v1/analytics`:
+
+| Path | Source |
+|------|--------|
+| `GET /costs/summary?days=7` | `agent_runs` |
+| `GET /costs/by-model` | `email_drafts.generation_context.model` |
+| `GET /quality/scores` | JSONB quality_scores |
+| `GET /guardrails/failures` | `guardrail_results` |
+| `GET /agent/decisions` | `agent_runs.decision` |
+
+Investor-facing: **cost per run**, **send/hold/reject mix**, **personalization_score** — not token vanity charts.
+
 ## Docs
 
 - Swagger UI: http://localhost:8080/docs
@@ -280,3 +309,6 @@ RAM budget: `langfuse-db` 256m + `langfuse` 768m. Do not start Langfuse on a mac
 - Days 1–8 recap (self-check, diagrams, interview): [RU](research/days-1-8-summary.ru.md) · [EN](research/days-1-8-summary.en.md)
 - Days 1–5 only: [RU](research/days-1-5-summary.ru.md) · [EN](research/days-1-5-summary.en.md)
 - Langfuse observability: [research/langfuse-observability-for-llm.md](research/langfuse-observability-for-llm.md)
+- Prompt catalog: [PROMPTS.md](PROMPTS.md)
+- Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Days 1–10: [docs/DAY10_SUMMARY.md](docs/DAY10_SUMMARY.md)

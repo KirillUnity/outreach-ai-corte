@@ -42,6 +42,20 @@ def test_route_after_validate_with_errors_high_iteration() -> None:
     )
 
 
+def test_route_after_validate_guardrail_blockers_low_iteration() -> None:
+    assert (
+        route_after_validate(
+            _base(
+                iteration=1,
+                guardrail_results=[
+                    {"name": "pii_detection", "passed": False, "severity": "error"}
+                ],
+            )
+        )
+        == "generate_email"
+    )
+
+
 def test_route_after_decide_send() -> None:
     assert route_after_decide(_base(decision="send")) == "save_and_send"
 

@@ -34,8 +34,30 @@ def test_decide_sends_when_all_ok() -> None:
     settings = Settings(
         agent=AgentSettings(require_human_approval=False, require_deliverability_check=False)
     )
-    out = decide({"validation_errors": [], "deliverability_ok": True}, settings)
+    out = decide({"validation_errors": [], "deliverability_ok": True, "guardrail_results": []}, settings)
     assert out["decision"] == "send"
+
+
+def test_decide_rejects_on_guardrail_blockers() -> None:
+    settings = Settings(
+        agent=AgentSettings(require_human_approval=False, require_deliverability_check=False)
+    )
+    out = decide(
+        {
+            "validation_errors": [],
+            "guardrail_results": [
+                {
+                    "name": "pii_detection",
+                    "passed": False,
+                    "severity": "error",
+                    "reason": "possible PII in outbound copy",
+                }
+            ],
+        },
+        settings,
+    )
+    assert out["decision"] == "reject"
+    assert "guardrails" in (out["decision_reason"] or "")
 
 
 async def test_load_person_not_found_adds_error() -> None:

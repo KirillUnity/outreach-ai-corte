@@ -163,6 +163,7 @@ class EmailDraftService:
                 subject=meta["subject"],
                 body=meta["body"],
                 goal=request.goal,
+                guardrail_results=meta.get("guardrail_results"),
                 generation_context={
                     "rag_context_used": meta.get("rag_context_used") or [],
                     "model": meta.get("model"),
@@ -172,6 +173,10 @@ class EmailDraftService:
                     "validation_errors": meta.get("validation_errors") or [],
                     "retried": meta.get("retried", False),
                     "quality_scores": meta.get("quality_scores") or {},
+                    "guardrail_results": meta.get("guardrail_results") or [],
+                    "guardrails_passed": meta.get("guardrails_passed"),
+                    "decision": meta.get("decision"),
+                    "prompt_variant": meta.get("prompt_variant"),
                     "sender_name": request.sender_name,
                     "sender_title": request.sender_title,
                     "sender_company": request.sender_company,

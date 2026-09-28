@@ -19,6 +19,7 @@ class EmailDraftCreate(BaseModel):
     body: str = Field(..., min_length=1)
     goal: EmailGoal | None = EmailGoal.INTRO
     generation_context: dict | None = None
+    guardrail_results: dict | list | None = None
     is_sent: bool = False
 
 
@@ -30,6 +31,7 @@ class EmailDraftUpdate(BaseModel):
     body: str | None = Field(default=None, min_length=1)
     goal: EmailGoal | None = None
     generation_context: dict | None = None
+    guardrail_results: dict | list | None = None
     is_sent: bool | None = None
     sent_at: datetime | None = None
 
@@ -45,6 +47,7 @@ class EmailDraftResponse(BaseModel):
     body: str
     goal: EmailGoal
     generation_context: dict | None
+    guardrail_results: dict | list | None = None
     is_sent: bool
     sent_at: datetime | None
     created_at: datetime
@@ -92,3 +95,5 @@ class EmailGenerationResponse(BaseModel):
     estimated_cost_usd: float
     model: str
     generation_duration_seconds: float
+    guardrail_results: list | dict | None = None
+    decision: str | None = None

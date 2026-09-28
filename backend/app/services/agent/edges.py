@@ -14,10 +14,16 @@ def route_after_load(state: OutreachState) -> str:
 
 def route_after_validate(state: OutreachState) -> str:
     """One regenerate, then continue even if the draft is still dirty."""
-    if state.get("validation_errors"):
-        if int(state.get("iteration") or 0) < 2:
-            return "generate_email"
-        return "check_deliverability"
+    blockers = [
+        row
+        for row in (state.get("guardrail_results") or [])
+        if isinstance(row, dict)
+        and not row.get("passed")
+        and row.get("severity") in {"error", "critical"}
+    ]
+    dirty = bool(state.get("validation_errors")) or bool(blockers)
+    if dirty and int(state.get("iteration") or 0) < 2:
+        return "generate_email"
     return "check_deliverability"
 
 
