@@ -1,6 +1,7 @@
 # Outreach AI Cortex — итоги дней 1–5
 
 Шпаргалка для самопроверки и подготовки к собеседованию (дни 1–5).  
+Полный итог дней 1–12: [days-1-12-summary.ru.md](days-1-12-summary.ru.md).  
 Полные дни 1–8: [days-1-8-summary.ru.md](days-1-8-summary.ru.md).  
 Английская версия: [days-1-5-summary.en.md](days-1-5-summary.en.md).
 

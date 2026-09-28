@@ -1,6 +1,7 @@
 # Outreach AI Cortex — Days 1–5 recap
 
 Study sheet for self-checks and interview prep (Days 1–5).  
+Full Days 1–12 recap: [days-1-12-summary.en.md](days-1-12-summary.en.md).  
 Full Days 1–8: [days-1-8-summary.en.md](days-1-8-summary.en.md).  
 Russian version: [days-1-5-summary.ru.md](days-1-5-summary.ru.md).
 

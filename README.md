@@ -337,7 +337,8 @@ docker stats outreach-neo4j   # stay under ~1 GB
 
 - Swagger UI: http://localhost:8080/docs
 - ReDoc: http://localhost:8080/redoc
-- Days 1–8 recap (self-check, diagrams, interview): [RU](research/days-1-8-summary.ru.md) · [EN](research/days-1-8-summary.en.md)
+- **Days 1–12 recap (canonical):** [RU](research/days-1-12-summary.ru.md) · [EN](research/days-1-12-summary.en.md)
+- Days 1–8 recap: [RU](research/days-1-8-summary.ru.md) · [EN](research/days-1-8-summary.en.md)
 - Days 1–5 only: [RU](research/days-1-5-summary.ru.md) · [EN](research/days-1-5-summary.en.md)
 - Langfuse observability: [research/langfuse-observability-for-llm.md](research/langfuse-observability-for-llm.md)
 - Prompt catalog: [PROMPTS.md](PROMPTS.md)

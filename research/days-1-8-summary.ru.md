@@ -2,6 +2,7 @@
 
 Шпаргалка для самопроверки, схем на запоминание и подготовки к собеседованию.  
 English: [days-1-8-summary.en.md](days-1-8-summary.en.md).  
+Полный итог дней 1–12: [days-1-12-summary.ru.md](days-1-12-summary.ru.md).  
 Дни 1–5 отдельно (короче): [days-1-5-summary.ru.md](days-1-5-summary.ru.md).
 
 **Стек:** Python 3.12, FastAPI, SQLAlchemy 2.0 async, PostgreSQL 16, ChromaDB, Poetry, Docker Compose.  

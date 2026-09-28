@@ -2,6 +2,7 @@
 
 Study sheet: self-check questions, diagrams to memorize, interview prep.  
 Russian: [days-1-8-summary.ru.md](days-1-8-summary.ru.md).  
+Full Days 1–12 recap: [days-1-12-summary.en.md](days-1-12-summary.en.md).  
 Shorter Days 1–5 only: [days-1-5-summary.en.md](days-1-5-summary.en.md).
 
 **Stack:** Python 3.12, FastAPI, SQLAlchemy 2.0 async, PostgreSQL 16, ChromaDB, Poetry, Docker Compose.  
