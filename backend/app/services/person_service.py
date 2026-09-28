@@ -17,6 +17,7 @@ from app.schemas.company import CompanyCreate
 from app.schemas.person import PersonCreate, PersonUpdate, normalize_linkedin_url
 from app.services.company_service import CompanyService
 from app.services.exceptions import DuplicateError, NotFoundError
+from app.services.graph.write_hooks import delete_person_in_graph, sync_person_after_write
 from app.services.linkedin_service import LinkedInService
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ class PersonService:
             await self.db.rollback()
             raise DuplicateError("Person with this linkedin_url already exists") from None
         await self.db.refresh(person)
+        await sync_person_after_write(person)
         return person
 
     async def get_by_id(self, person_id: UUID) -> Person | None:
@@ -120,6 +122,7 @@ class PersonService:
             await self.db.rollback()
             raise DuplicateError("Person with this linkedin_url already exists") from None
         await self.db.refresh(person)
+        await sync_person_after_write(person)
         return person
 
     async def delete(self, person_id: UUID) -> bool:
@@ -129,6 +132,7 @@ class PersonService:
             return False
         await self.db.delete(person)
         await self.db.commit()
+        await delete_person_in_graph(person_id)
         return True
 
     async def set_company(self, person_id: UUID, company_id: UUID) -> Person | None:
@@ -140,6 +144,7 @@ class PersonService:
         person.company_id = company_id
         await self.db.commit()
         await self.db.refresh(person)
+        await sync_person_after_write(person)
         return person
 
     async def get_with_company(self, person_id: UUID) -> Person | None:

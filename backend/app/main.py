@@ -6,9 +6,19 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 from sqlalchemy import text
 
-from app.api.routers import agent, analytics, companies, domain_health, email_drafts, health, persons
+from app.api.routers import (
+    agent,
+    analytics,
+    companies,
+    domain_health,
+    email_drafts,
+    graph,
+    health,
+    persons,
+)
 from app.core.config import settings
 from app.core.database import engine
+from app.api.deps import get_neo4j_client
 from app.services.tracing import get_tracing
 
 
@@ -22,8 +32,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     async with engine.begin() as conn:
         await conn.execute(text("SELECT 1"))
+    if settings.neo4j.enabled:
+        try:
+            from app.services.graph.init_schema import GraphSchemaInitializer
+
+            client = get_neo4j_client()
+            await GraphSchemaInitializer(client).init_constraints_and_indexes()
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("neo4j schema init skipped")
     yield
     get_tracing().flush()
+    if settings.neo4j.enabled:
+        client = get_neo4j_client()
+        await client.close()
+        from app.services.neo4j_client import reset_neo4j_client
+
+        reset_neo4j_client()
+        get_neo4j_client.cache_clear()
     await engine.dispose()
 
 
@@ -40,3 +67,4 @@ app.include_router(email_drafts.router, prefix="/api/v1")
 app.include_router(domain_health.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(graph.router, prefix="/api/v1")

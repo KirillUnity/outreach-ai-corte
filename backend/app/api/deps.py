@@ -11,6 +11,7 @@ from app.services.cost_tracker import CostTracker
 from app.services.email_generator import EmailGenerator
 from app.services.linkedin_service import LinkedInService
 from app.services.llm_client import LLMClient
+from app.services.neo4j_client import Neo4jClient, get_neo4j_client as _get_neo4j_client
 from app.services.rag_service import RAGService
 from app.services.tracing import get_tracing
 
@@ -30,6 +31,12 @@ def get_settings() -> Settings:
 def get_linkedin_service() -> LinkedInService:
     """Build a LinkedIn adapter from process settings (mock unless LINKEDIN_MODE=real)."""
     return LinkedInService(settings)
+
+
+@lru_cache
+def get_neo4j_client() -> Neo4jClient:
+    """Process-wide Bolt driver. A new driver per request would leak sockets and RAM."""
+    return _get_neo4j_client()
 
 
 def get_email_generator() -> EmailGenerator:

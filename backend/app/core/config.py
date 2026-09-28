@@ -88,6 +88,19 @@ class PromptABSettings(BaseModel):
     enabled: bool = False
 
 
+class Neo4jSettings(BaseModel):
+    """Bolt driver settings. Heap/pagecache live in Compose, not here."""
+
+    uri: str = "bolt://neo4j:7687"
+    user: str = "neo4j"
+    password: str = "change-me-please-strong-password"
+    database: str = "neo4j"
+    max_connection_pool_size: int = 50
+    connection_timeout: int = 30
+    enabled: bool = True
+    auto_sync_on_write: bool = False
+
+
 class LinkedInSettings(BaseModel):
     """LinkedIn enrichment: mock (default) or Phantombuster."""
 
@@ -128,6 +141,8 @@ class Settings(BaseSettings):
     agent: AgentSettings = Field(default_factory=AgentSettings)
     langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
     prompt_ab: PromptABSettings = Field(default_factory=PromptABSettings)
+    neo4j: Neo4jSettings = Field(default_factory=Neo4jSettings)
+    graph_sync_token: str = ""
     # Convenience aliases so .env can use flat names from the Day 6/7 specs.
     phantombuster_api_key: str = ""
     openai_api_key: str = ""

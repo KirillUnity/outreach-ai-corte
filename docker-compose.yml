@@ -72,6 +72,34 @@ services:
       retries: 3
       start_period: 25s
 
+  neo4j:
+    image: neo4j:5-community
+    container_name: outreach-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    mem_limit: 1024m
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-change-me-please-strong-password}
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - outreach-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
   langfuse-db:
     image: postgres:16-alpine
     container_name: outreach-langfuse-db
@@ -126,6 +154,8 @@ volumes:
   postgres_data:
   chroma_data:
   langfuse_db_data:
+  neo4j_data:
+  neo4j_logs:
 
 networks:
   outreach-network:

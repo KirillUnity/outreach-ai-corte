@@ -11,6 +11,10 @@ from app.core.config import settings
 from app.models.company import Company
 from app.schemas.company import CompanyCreate, CompanyUpdate
 from app.services.exceptions import NotFoundError
+from app.services.graph.write_hooks import (
+    delete_company_in_graph,
+    sync_company_after_write,
+)
 from app.services.rag_service import RAGService
 from app.services.site_parser import ParseResult, SiteParser
 
@@ -54,6 +58,7 @@ class CompanyService:
             await self.db.rollback()
             raise
         await self.db.refresh(company)
+        await sync_company_after_write(company)
         return company
 
     async def get_by_domain(self, domain: str) -> Company | None:
@@ -99,6 +104,7 @@ class CompanyService:
             await self.db.rollback()
             raise
         await self.db.refresh(company)
+        await sync_company_after_write(company)
         return company
 
     async def delete(self, domain: str) -> bool:
@@ -106,8 +112,10 @@ class CompanyService:
         company = await self.get_by_domain(domain)
         if company is None:
             return False
+        company_id = company.id
         await self.db.delete(company)
         await self.db.commit()
+        await delete_company_in_graph(company_id)
         return True
 
     async def research(self, domain: str) -> tuple[Company, ParseResult, int]:

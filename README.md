@@ -5,7 +5,7 @@ B2B outreach platform with AI agents. FastAPI + PostgreSQL + ChromaDB, all in Do
 ## Stack
 
 - Python 3.12, FastAPI, SQLAlchemy 2.0 (async), Alembic
-- PostgreSQL 16, ChromaDB, Langfuse (self-hosted, optional keys)
+- PostgreSQL 16, ChromaDB, Neo4j 5 (Bolt), Langfuse (self-hosted, optional keys)
 - Docker Compose (no Kubernetes)
 
 ## Quick start
@@ -302,6 +302,27 @@ Read-only SQL under `/api/v1/analytics`:
 
 Investor-facing: **cost per run**, **send/hold/reject mix**, **personalization_score** — not token vanity charts.
 
+## Graph Database (Neo4j)
+
+Bolt UI: **http://localhost:7474** (`bolt://localhost:7687`). Heap max **512m**, pagecache **256m**, container `mem_limit` **1024m**. Postgres remains CRUD source of truth; Neo4j is a path/index.
+
+Use cases:
+
+- Shortest intro path between two people (`GET /api/v1/graph/path`)
+- Company org chart (`GET /api/v1/graph/company/{domain}/network?depth=2`)
+- Mutual connections into a target account (`GET /api/v1/graph/person/{id}/mutual-connections`)
+
+```bash
+docker compose up -d neo4j
+docker compose exec neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "RETURN 1;"
+docker compose exec api poetry run python -m scripts.sync_to_neo4j
+docker stats outreach-neo4j   # stay under ~1 GB
+```
+
+`POST /api/v1/graph/sync` needs header `X-Admin-Token: $GRAPH_SYNC_TOKEN` (or `DEBUG=true` with empty token). `NEO4J_AUTO_SYNC_ON_WRITE=false` by default so CRUD tests do not open Bolt.
+
+Capture a Browser screenshot (`MATCH (n) RETURN n LIMIT 25`) for interviews. Why Neo4j vs CTE: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md). Schema: `get_schema_description()` in `backend/app/services/graph/schema.py`.
+
 ## Docs
 
 - Swagger UI: http://localhost:8080/docs
@@ -312,3 +333,4 @@ Investor-facing: **cost per run**, **send/hold/reject mix**, **personalization_s
 - Prompt catalog: [PROMPTS.md](PROMPTS.md)
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Days 1–10: [docs/DAY10_SUMMARY.md](docs/DAY10_SUMMARY.md)
+- Neo4j vs Postgres graph queries: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md)
