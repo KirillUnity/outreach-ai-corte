@@ -22,6 +22,7 @@ RUN if [ ! -f poetry.lock ]; then poetry lock; fi \
 COPY backend ./backend
 COPY scripts ./scripts
 COPY docs ./docs
+COPY tools ./tools
 
 WORKDIR /app/backend
 

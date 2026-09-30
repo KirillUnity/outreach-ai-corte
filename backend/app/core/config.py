@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -101,6 +101,36 @@ class Neo4jSettings(BaseModel):
     auto_sync_on_write: bool = False
 
 
+class DeliverabilitySettings(BaseModel):
+    """Live DNS lookups for SPF / DKIM / DMARC / MX."""
+
+    dns_timeout: float = 5.0
+    dns_lifetime: float = 10.0
+    dns_nameservers: list[str] = Field(default_factory=lambda: ["1.1.1.1", "8.8.8.8"])
+    dkim_selectors: list[str] = Field(
+        default_factory=lambda: [
+            "google",
+            "default",
+            "mail",
+            "dkim",
+            "k1",
+            "s1",
+            "s2",
+            "selector1",
+            "selector2",
+            "mandrill",
+        ]
+    )
+    cache_ttl_seconds: int = 3600
+
+    @field_validator("dns_nameservers", "dkim_selectors", mode="before")
+    @classmethod
+    def _split_csv(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [part.strip() for part in value.split(",") if part.strip()]
+        return value
+
+
 class LinkedInSettings(BaseModel):
     """LinkedIn enrichment: mock (default) or Phantombuster."""
 
@@ -142,6 +172,7 @@ class Settings(BaseSettings):
     langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
     prompt_ab: PromptABSettings = Field(default_factory=PromptABSettings)
     neo4j: Neo4jSettings = Field(default_factory=Neo4jSettings)
+    deliverability: DeliverabilitySettings = Field(default_factory=DeliverabilitySettings)
     graph_sync_token: str = ""
     # Convenience aliases so .env can use flat names from the Day 6/7 specs.
     phantombuster_api_key: str = ""

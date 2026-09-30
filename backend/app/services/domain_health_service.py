@@ -1,19 +1,29 @@
 """Domain health business logic (CRUD + upsert)."""
 
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.domain_health import DomainHealth
+from app.schemas.company import normalize_domain
 from app.schemas.domain_health import DomainHealthCreate, DomainHealthUpdate
 from app.services.exceptions import DuplicateError
+
+if TYPE_CHECKING:
+    from app.services.deliverability.checker import DeliverabilityChecker
 
 
 class DomainHealthService:
     """CRUD operations for `DomainHealth` using an injected async session."""
 
-    def __init__(self, db: AsyncSession) -> None:
+    def __init__(self, db: AsyncSession, checker: DeliverabilityChecker | None = None) -> None:
         self.db = db
+        self.checker = checker
 
     async def create(self, data: DomainHealthCreate) -> DomainHealth:
         """Insert a snapshot. Caller should handle DuplicateError on unique domain."""
@@ -88,3 +98,37 @@ class DomainHealthService:
         await self.db.commit()
         await self.db.refresh(existing)
         return existing, False
+
+    async def check_and_save(
+        self,
+        domain: str,
+        *,
+        result: dict[str, Any] | None = None,
+    ) -> DomainHealth:
+        """Run live DNS checks (unless `result` is given) and upsert `DomainHealth`."""
+        from app.services.deliverability.checker import DeliverabilityChecker
+
+        normalized = normalize_domain(domain)
+        checker = self.checker or DeliverabilityChecker()
+        payload = result if result is not None else await checker.check_domain(normalized)
+        mx_rows = payload.get("mx", {}).get("records") or []
+        mx_strings = [
+            f"{row.get('priority')} {row.get('exchange')}".strip()
+            for row in mx_rows
+            if isinstance(row, dict)
+        ]
+        checked_at = payload.get("checked_at") or datetime.now(timezone.utc)
+        snapshot, _created = await self.upsert(
+            DomainHealthCreate(
+                domain=normalized,
+                spf_record=payload.get("spf", {}).get("record"),
+                spf_valid=bool(payload.get("spf", {}).get("valid")),
+                dkim_record=payload.get("dkim", {}).get("record"),
+                dkim_valid=bool(payload.get("dkim", {}).get("valid")),
+                dmarc_record=payload.get("dmarc", {}).get("record"),
+                dmarc_policy=payload.get("dmarc", {}).get("policy"),
+                mx_records=mx_strings or None,
+                checked_at=checked_at,
+            )
+        )
+        return snapshot

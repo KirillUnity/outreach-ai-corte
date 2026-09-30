@@ -3,13 +3,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_settings
+from app.core.config import Settings
 from app.schemas.domain_health import (
+    DeliverabilityCheckResponse,
     DomainHealthCreate,
     DomainHealthListResponse,
     DomainHealthResponse,
     DomainHealthUpdate,
 )
+from app.services.deliverability.checker import DeliverabilityChecker
 from app.services.domain_health_service import DomainHealthService
 from app.services.exceptions import DuplicateError
 
@@ -54,6 +57,26 @@ async def list_domain_health(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get(
+    "/check/{domain}",
+    response_model=DeliverabilityCheckResponse,
+    summary="Live SPF/DKIM/DMARC/MX check",
+)
+async def check_domain_deliverability(
+    domain: str,
+    save: bool = Query(default=True, description="Persist snapshot to domain_health"),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DeliverabilityCheckResponse:
+    """Query DNS and return a scored deliverability report. Static path before /{domain}."""
+    checker = DeliverabilityChecker(settings)
+    result = await checker.check_domain(domain)
+    if save:
+        service = DomainHealthService(db, checker=checker)
+        await service.check_and_save(domain, result=result)
+    return DeliverabilityCheckResponse.model_validate(result)
 
 
 @router.get(

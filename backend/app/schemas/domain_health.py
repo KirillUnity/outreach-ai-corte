@@ -76,3 +76,54 @@ class DomainHealthListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class SPFResult(BaseModel):
+    valid: bool
+    record: str | None = None
+    policy: str | None = None
+    mechanisms: list[str] = Field(default_factory=list)
+    lookup_count: int = 0
+    warnings: list[str] = Field(default_factory=list)
+    reason: str | None = None
+
+
+class DKIMResult(BaseModel):
+    valid: bool
+    selector: str | None = None
+    record: str | None = None
+    key_type: str | None = None
+    key_length: int | None = None
+    tried_selectors: list[str] = Field(default_factory=list)
+    reason: str | None = None
+
+
+class DMARCResult(BaseModel):
+    valid: bool
+    record: str | None = None
+    policy: str | None = None
+    subdomain_policy: str | None = None
+    rua: list[str] = Field(default_factory=list)
+    pct: int | None = None
+    warnings: list[str] = Field(default_factory=list)
+    reason: str | None = None
+
+
+class MXResult(BaseModel):
+    valid: bool
+    records: list[dict] = Field(default_factory=list)
+    provider: str = "unknown"
+    reason: str | None = None
+
+
+class DeliverabilityCheckResponse(BaseModel):
+    domain: str
+    spf: SPFResult
+    dkim: DKIMResult
+    dmarc: DMARCResult
+    mx: MXResult
+    overall_score: int
+    risk_level: str
+    checked_at: datetime
+    recommendations: list[str] = Field(default_factory=list)
+

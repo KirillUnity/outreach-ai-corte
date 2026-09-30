@@ -109,13 +109,37 @@ curl -s -o /dev/null -w "%{http_code}\n" -X DELETE http://localhost:8080/api/v1/
 
 Resource is named by capability, not table name: `/deliverability`.
 
+Live DNS (SPF / DKIM / DMARC / MX) is `GET /deliverability/check/{domain}` — register **before** `GET /{domain}` so `check` is not treated as a domain name.
+
 | Method | Path | Status | Description |
 |--------|------|--------|-------------|
 | POST | `/deliverability/` | 201 or 200 | Upsert by domain (create / replace) |
 | GET | `/deliverability/` | 200 | Paginated list |
-| GET | `/deliverability/{domain}` | 200, 404 | Get by domain |
+| GET | `/deliverability/check/{domain}` | 200 | Live DNS report + score (`save=true` upserts `domain_health`) |
+| GET | `/deliverability/{domain}` | 200, 404 | Get stored snapshot |
 | PATCH | `/deliverability/{domain}` | 200, 404, 409 | Partial update |
 | DELETE | `/deliverability/{domain}` | 204, 404 | Delete snapshot |
+
+```bash
+curl -s "http://localhost:8080/api/v1/deliverability/check/gmail.com" | python -m json.tool
+docker compose exec api poetry run python /app/tools/deliverability_cli.py gmail.com
+```
+
+CLI example:
+
+```
+┌ Deliverability Report: gmail.com ─┐
+│ Check │ Status    │ Details      │
+│ SPF   │ Valid     │ policy=…     │
+│ DKIM  │ Valid     │ selector=…   │
+│ DMARC │ Valid     │ policy=reject│
+│ MX    │ Valid     │ provider=google │
+Score: …/100   Risk: low
+```
+
+Notes: [research/email-deliverability-2024.md](research/email-deliverability-2024.md). Nested env: `DELIVERABILITY_DNS_TIMEOUT`, `DELIVERABILITY_CACHE_TTL_SECONDS`. In-process TTL cache is per container, not shared across replicas.
+
+The LangGraph node still uses `app.services.deliverability_checker.DeliverabilityChecker` (DB snapshot). Live DNS lives in `app.services.deliverability.checker`.
 
 ## Migrations
 
