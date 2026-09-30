@@ -63,3 +63,20 @@ export interface CompetitorsResponse {
     top_people?: unknown[]
   }>
 }
+
+export interface WarmIntroCandidate {
+  target_person: GraphNode
+  target_company: GraphNode
+  path: GraphNode[]
+  distance: number
+  mutual_connections: number
+  influence_score: number
+  has_prior_contact: boolean
+}
+
+export interface WarmIntroSearchResponse {
+  sender_person_id: string | null
+  target_company_domain: string
+  candidates: WarmIntroCandidate[]
+  total: number
+}

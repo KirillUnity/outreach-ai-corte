@@ -1,4 +1,4 @@
-# Prompt catalog (v1.2)
+# Prompt catalog (v1.3)
 
 All LLM-facing strings live in `backend/app/services/prompts/email_prompts.py`. Change copy there, then note the changelog below. Embeddings have no NL prompt. LinkedIn mock and the site parser do not call an LLM.
 
@@ -11,7 +11,7 @@ All LLM-facing strings live in `backend/app/services/prompts/email_prompts.py`. 
 - **Expected output:** None alone. Combined with the user prompt the model must return `{"subject": "...", "body": "..."}`.
 - **Good:** Short observation about the recipient’s product, one ask for 15 minutes, no buzzwords.
 - **Bad:** “I hope this email finds you well”, ALL CAPS, two CTAs, facts not in RAG.
-- **Changelog:** v1.0 initial. v1.1 spam-word ban + JSON example. v1.2 guardrail retry suffix (do not invent phones/companies).
+- **Changelog:** v1.0 initial. v1.1 spam-word ban + JSON example. v1.2 guardrail retry suffix (do not invent phones/companies). v1.3 warm-intro user template.
 
 ## User prompts
 
@@ -29,6 +29,15 @@ All LLM-facing strings live in `backend/app/services/prompts/email_prompts.py`. 
 | `{custom_instructions}` | Empty string; used for validator/guardrail retries |
 
 **Expected output:** JSON object only, no markdown fences (parser strips fences as a fallback).
+
+### email_generation_user_warm_intro (`USER_PROMPT_WITH_WARM_INTRO`)
+
+Same variables as `USER_PROMPT_TEMPLATE`, plus `{mutual_connection_name}`.
+
+- **Purpose:** Only used when `graph_context.warm_intro_available` is true **and** we have a real name (not “a mutual connection”). Forces the opener to mention that person and forbids invented intro details.
+- **Good:** “Ada mentioned you are hiring a RevOps lead…”
+- **Bad:** Inventing that Ada works at Stripe or that you had lunch last week.
+- **Changelog:** v1.3 added for Day 14 graph personalization.
 
 ### Validation / guardrail retries
 
@@ -51,13 +60,14 @@ All LLM-facing strings live in `backend/app/services/prompts/email_prompts.py`. 
 
 ## Versioning
 
-**Current: v1.2**
+**Current: v1.3**
 
 | Version | Change | What we watch |
 |---------|--------|----------------|
 | v1.0 | First system+user pair | Mock fixture stability |
 | v1.1 | Spam list + JSON-only | `spam_score`, parse errors |
 | v1.2 | Guardrail retry copy | `guardrails/failures`, reject rate |
+| v1.3 | Warm-intro user prompt | `generation_context.graph_context`, reply rate |
 
 A/B: `PROMPT_AB_ENABLED=true` picks `v1_default` vs `v1_direct_cta` (`app.services.prompt_ab`). Log `prompt_variant` on Langfuse generations. Keep A/B **off** in CI.
 

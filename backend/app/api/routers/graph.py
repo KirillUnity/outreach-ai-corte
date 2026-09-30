@@ -23,6 +23,8 @@ from app.schemas.graph import (
     PathToCompanyResponse,
     RecommendationResponse,
     SyncResponse,
+    WarmIntroCandidate,
+    WarmIntroSearchResponse,
 )
 from app.services.company_service import CompanyService
 from app.services.graph.analytics import GraphAnalytics
@@ -274,6 +276,36 @@ async def warm_intro_paths(
         person_id, target_company_domain, limit=limit
     )
     return RecommendationResponse(items=items)
+
+
+@router.get("/warm-intro/search", response_model=WarmIntroSearchResponse)
+async def search_warm_intro(
+    sender_person_id: UUID = Query(...),
+    target_company_domain: str = Query(...),
+    max_depth: int = Query(default=4, ge=1, le=6),
+    limit: int = Query(default=10, ge=1, le=50),
+    client: Neo4jClient = Depends(get_neo4j_client),
+) -> WarmIntroSearchResponse:
+    """Warm intro paths from sender to uncontacted people at the target account."""
+    _require_graph(client)
+    rows = await RecommendationService(client, _connections(client)).recommend_warm_intro_paths(
+        person_id=sender_person_id,
+        target_company_domain=target_company_domain,
+        limit=limit,
+        max_depth=max_depth,
+    )
+    candidates: list[WarmIntroCandidate] = []
+    for row in rows:
+        try:
+            candidates.append(WarmIntroCandidate.model_validate(row))
+        except Exception:
+            continue
+    return WarmIntroSearchResponse(
+        sender_person_id=sender_person_id,
+        target_company_domain=target_company_domain,
+        candidates=candidates,
+        total=len(candidates),
+    )
 
 
 @router.get("/analytics/stats", response_model=GraphStatsResponse)

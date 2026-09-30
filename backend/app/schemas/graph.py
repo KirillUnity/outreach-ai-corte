@@ -64,6 +64,23 @@ class RecommendationResponse(BaseModel):
     items: list[dict] = Field(default_factory=list)
 
 
+class WarmIntroCandidate(BaseModel):
+    target_person: GraphNodeResponse
+    target_company: GraphNodeResponse
+    path: list[GraphNodeResponse]
+    distance: int
+    mutual_connections: int
+    influence_score: float
+    has_prior_contact: bool = False
+
+
+class WarmIntroSearchResponse(BaseModel):
+    sender_person_id: UUID | None = None
+    target_company_domain: str
+    candidates: list[WarmIntroCandidate]
+    total: int
+
+
 class GraphStatsResponse(BaseModel):
     nodes: dict[str, int] = Field(default_factory=dict)
     relationships: dict[str, int] = Field(default_factory=dict)

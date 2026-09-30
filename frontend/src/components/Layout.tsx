@@ -5,6 +5,7 @@ const navItems = [
   { to: '/companies', label: 'Companies' },
   { to: '/persons', label: 'Persons' },
   { to: '/graph', label: 'Graph' },
+  { to: '/warm-intro', label: 'Warm Intro' },
 ]
 
 export default function Layout() {

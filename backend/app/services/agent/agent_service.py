@@ -105,6 +105,7 @@ class OutreachAgentService:
         draft_service = EmailDraftService(self.db, email_generator=email_generator)
         connection_service = None
         graph_service = None
+        recommendation_service = None
         try:
             from app.services.neo4j_client import get_neo4j_client
 
@@ -115,6 +116,9 @@ class OutreachAgentService:
 
                 graph_service = GraphService(neo4j)
                 connection_service = ConnectionService(graph_service, neo4j)
+                from app.services.graph.recommendations import RecommendationService
+
+                recommendation_service = RecommendationService(neo4j, connection_service)
         except Exception:
             logger.exception("neo4j wiring skipped for outreach agent")
         return build_outreach_graph(
@@ -129,6 +133,7 @@ class OutreachAgentService:
             tracing=self.tracing,
             graph_service=graph_service,
             connection_service=connection_service,
+            recommendation_service=recommendation_service,
         )
 
     async def run(

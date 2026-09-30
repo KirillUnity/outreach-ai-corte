@@ -4,6 +4,7 @@ import { companiesApi } from '../api/companies'
 import { apiErrorMessage } from '../api/errors'
 import { graphApi } from '../api/graph'
 import type { Company, CompetitorsResponse, Person } from '../api/types'
+import { InfluenceBadge } from '../components/InfluenceBadge'
 import { Button } from '../components/ui/Button'
 import { Card, CardTitle } from '../components/ui/Card'
 import { ErrorBox } from '../components/ui/ErrorBox'
@@ -31,6 +32,7 @@ export default function CompanyDetailPage() {
   const [persons, setPersons] = useState<Person[]>([])
   const [decisionMakers, setDecisionMakers] = useState<unknown[]>([])
   const [competitors, setCompetitors] = useState<CompetitorsResponse | null>(null)
+  const [recommendedTargets, setRecommendedTargets] = useState<unknown[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,14 +45,16 @@ export default function CompanyDetailPage() {
       .get(domain)
       .then(async (c) => {
         setCompany(c)
-        const [p, dm, comp] = await Promise.all([
+        const [p, dm, comp, rec] = await Promise.all([
           companiesApi.persons(c.id).catch(() => ({ items: [] as Person[] })),
           graphApi.decisionMakers(domain).catch(() => []),
           graphApi.competitors(domain).catch(() => null),
+          graphApi.recommendedTargets(domain).catch(() => []),
         ])
         setPersons(p.items || [])
         setDecisionMakers(dm)
         setCompetitors(comp)
+        setRecommendedTargets(Array.isArray(rec) ? rec : [])
       })
       .catch((e) => setError(apiErrorMessage(e)))
       .finally(() => setLoading(false))
@@ -83,8 +87,11 @@ export default function CompanyDetailPage() {
           {persons.length ? (
             persons.map((p) => (
               <div key={p.id} className="py-2 border-b border-slate-800 last:border-0">
-                <div className="text-white">
-                  {p.first_name} {p.last_name}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-white">
+                    {p.first_name} {p.last_name}
+                  </div>
+                  <InfluenceBadge personId={p.id} />
                 </div>
                 <div className="text-slate-500 text-sm">{p.title || '—'}</div>
               </div>
@@ -125,6 +132,37 @@ export default function CompanyDetailPage() {
             })
           ) : (
             <div className="text-slate-500">No competitors tracked</div>
+          )}
+        </Card>
+
+        <Card>
+          <CardTitle>Recommended targets</CardTitle>
+          {recommendedTargets.length ? (
+            recommendedTargets.map((row, i) => {
+              const rec = row as Record<string, unknown>
+              const person =
+                rec.person && typeof rec.person === 'object'
+                  ? (rec.person as Record<string, unknown>)
+                  : rec
+              const name =
+                String(person.name || '').trim() ||
+                `${person.first_name || ''} ${person.last_name || ''}`.trim() ||
+                '—'
+              return (
+                <div
+                  key={i}
+                  className="py-2 border-b border-slate-800 last:border-0 flex justify-between items-center"
+                >
+                  <div>
+                    <div className="text-white">{name}</div>
+                    <div className="text-slate-500 text-sm">{String(person.title || rec.title || '—')}</div>
+                  </div>
+                  <div className="text-xs text-slate-400">{String(rec.connections_count ?? 0)} connections</div>
+                </div>
+              )
+            })
+          ) : (
+            <div className="text-slate-500">No recommendations</div>
           )}
         </Card>
 

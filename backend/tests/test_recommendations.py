@@ -24,29 +24,24 @@ class _WithData:
 
     async def execute_query(self, query: str, parameters: dict | None = None) -> list:
         _ = parameters
-        if "NOT (p)-[:PARTICIPATES_IN]->(:EmailThread)" in query and "$domain" in query:
-            return [{"person": {"id": str(self.target), "first_name": "Pat"}}]
-        if "shortestPath" in query:
+        if "shortestPath((sender)-[:CONNECTED_TO*1..6]-(target))" in query:
             return [
                 {
-                    "path": [
+                    "target": {
+                        "id": str(self.target),
+                        "first_name": "Pat",
+                        "last_name": "",
+                    },
+                    "company": {"id": str(uuid4()), "domain": "square.com", "name": "Square"},
+                    "path_nodes": [
                         {"id": str(self.me), "name": "Me"},
                         {"id": str(self.target), "name": "Pat"},
                     ],
                     "distance": 1,
-                }
-            ]
-        if "influence_score" in query:
-            return [
-                {
-                    "id": str(self.target),
-                    "direct_connections": 3,
-                    "second_degree_connections": 2,
+                    "mutual_connections": 1,
                     "influence_score": 4.0,
                 }
             ]
-        if "mutual:Person" in query:
-            return [{"mutual": {"id": str(uuid4()), "first_name": "Bridge"}}]
         return []
 
     async def execute_write(self, query: str, parameters: dict | None = None) -> dict:

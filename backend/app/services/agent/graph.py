@@ -61,6 +61,7 @@ def build_outreach_graph(
     guardrail_pipeline: GuardrailPipeline | None = None,
     graph_service: Any = None,
     connection_service: Any = None,
+    recommendation_service: Any = None,
 ) -> Any:
     """Compile the graph. MemorySaver is the default so pytest needs no extra tables."""
     workflow: StateGraph = StateGraph(OutreachState)
@@ -92,7 +93,9 @@ def build_outreach_graph(
         return await retrieve_rag_context(state, rag_service, email_generator)
 
     async def enrich_graph(state: OutreachState) -> dict:
-        return await enrich_with_graph(state, graph_service, connection_service)
+        return await enrich_with_graph(
+            state, graph_service, connection_service, recommendation_service
+        )
 
     async def generate_email(state: OutreachState) -> dict:
         return await generate_email_node(state, email_generator, person_service, company_service)

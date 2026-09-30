@@ -158,6 +158,39 @@ RETURN target {.*} AS target, bridge {.*} AS bridge, c {.*} AS company
 LIMIT $limit
 """
 
+QUERY_WARM_INTRO_CANDIDATES = """
+MATCH (sender:Person {id: $sender_id})
+MATCH (target_company:Company {domain: $target_domain})<-[:WORKS_AT]-(target:Person)
+WHERE target.id <> sender.id
+  AND NOT (target)-[:PARTICIPATES_IN]->(:EmailThread)
+OPTIONAL MATCH path = shortestPath((sender)-[:CONNECTED_TO*1..6]-(target))
+WITH sender, target, target_company, path
+OPTIONAL MATCH (sender)-[:CONNECTED_TO]->(mutual:Person)<-[:CONNECTED_TO]-(target)
+WITH sender, target, target_company, path,
+     count(DISTINCT mutual) AS mutual_connections
+OPTIONAL MATCH (target)-[:CONNECTED_TO]->(direct:Person)
+OPTIONAL MATCH (target)-[:CONNECTED_TO]->(:Person)-[:CONNECTED_TO]->(second:Person)
+WHERE second IS NULL OR second <> target
+WITH sender, target, target_company, path, mutual_connections,
+     count(DISTINCT direct) AS direct_connections,
+     count(DISTINCT second) AS second_degree
+RETURN
+    target {.*} AS target,
+    target_company {.*} AS company,
+    CASE WHEN path IS NULL THEN [] ELSE [node IN nodes(path) | {
+        id: node.id,
+        name: coalesce(node.first_name, '') + ' ' + coalesce(node.last_name, ''),
+        title: node.title
+    }] END AS path_nodes,
+    CASE WHEN path IS NULL THEN -1 ELSE length(path) END AS distance,
+    mutual_connections,
+    (direct_connections * 1.0) + (second_degree * 0.5) AS influence_score
+ORDER BY
+    CASE WHEN path IS NULL THEN 999 ELSE length(path) END ASC,
+    influence_score DESC
+LIMIT $limit
+"""
+
 QUERY_NODE_COUNTS = """
 MATCH (n)
 RETURN labels(n)[0] AS label, count(n) AS count

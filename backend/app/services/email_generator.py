@@ -20,6 +20,7 @@ from app.services.prompts.email_prompts import (
     GUARDRAIL_RETRY_SUFFIX,
     SYSTEM_PROMPT_OUTREACH,
     USER_PROMPT_TEMPLATE,
+    USER_PROMPT_WITH_WARM_INTRO,
     VALIDATION_RETRY_SUFFIX,
 )
 from app.services.rag_service import RAGService
@@ -77,6 +78,7 @@ class EmailGenerator:
         person: Person,
         company: Company | None,
         request: EmailGenerationRequest,
+        graph_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Return subject/body plus RAG chunks and token cost."""
         rag_chunks = await self._load_rag_chunks(person, company, request)
@@ -94,7 +96,9 @@ class EmailGenerator:
             variant = self.ab_tester.pick_variant()
             system = system + suffix_for(variant)
         extra_meta = {"prompt_variant": variant}
-        user = self._render_user_prompt(person, company, request, rag_context)
+        user = self._render_user_prompt(
+            person, company, request, rag_context, graph_context=graph_context
+        )
 
         result = await self.llm_client.chat_json(system, user, extra_metadata=extra_meta)
         subject, body = self._extract_email(result["parsed"])
@@ -159,6 +163,7 @@ class EmailGenerator:
             "guardrails_passed": passed,
             "decision": decision,
             "prompt_variant": variant,
+            "graph_context": graph_context or {},
         }
 
     def _guardrail_context(
@@ -208,23 +213,55 @@ class EmailGenerator:
         company: Company | None,
         request: EmailGenerationRequest,
         rag_context: str,
+        graph_context: dict[str, Any] | None = None,
     ) -> str:
         extra = ""
         if request.custom_instructions:
             extra = f"ADDITIONAL INSTRUCTIONS:\n{request.custom_instructions}"
-        return USER_PROMPT_TEMPLATE.format(
-            first_name=person.first_name,
-            last_name=person.last_name,
-            title=person.title or "unknown",
-            company_name=company.name if company is not None else "unknown",
-            rag_context=rag_context,
-            goal_description=GOAL_DESCRIPTIONS.get(request.goal, request.goal.value),
-            tone=request.tone,
-            sender_name=request.sender_name,
-            sender_title=request.sender_title,
-            sender_company=request.sender_company,
-            custom_instructions=extra,
-        )
+        mutual = self._mutual_connection_name(person, graph_context)
+        template = USER_PROMPT_WITH_WARM_INTRO if mutual else USER_PROMPT_TEMPLATE
+        payload = {
+            "first_name": person.first_name,
+            "last_name": person.last_name,
+            "title": person.title or "unknown",
+            "company_name": company.name if company is not None else "unknown",
+            "rag_context": rag_context,
+            "goal_description": GOAL_DESCRIPTIONS.get(request.goal, request.goal.value),
+            "tone": request.tone,
+            "sender_name": request.sender_name,
+            "sender_title": request.sender_title,
+            "sender_company": request.sender_company,
+            "custom_instructions": extra,
+        }
+        if mutual:
+            payload["mutual_connection_name"] = mutual
+        return template.format(**payload)
+
+    @staticmethod
+    def _mutual_connection_name(
+        person: Person,
+        graph_context: dict[str, Any] | None,
+    ) -> str | None:
+        if not graph_context or not graph_context.get("warm_intro_available"):
+            return None
+        via = str(graph_context.get("warm_intro_via") or "").strip()
+        recipient = f"{person.first_name or ''} {person.last_name or ''}".strip().lower()
+        hops = graph_context.get("warm_intro_path") or []
+        if not via and isinstance(hops, list):
+            for hop in reversed(hops):
+                if not isinstance(hop, dict):
+                    continue
+                name = str(hop.get("name") or "").strip()
+                if name and name.lower() != recipient:
+                    via = name
+                    break
+        if not via:
+            names = str(graph_context.get("warm_intro_names") or "").strip()
+            if names and names.lower() != "a mutual connection":
+                via = names.split(",")[0].strip()
+        if not via or via.lower() == recipient:
+            return None
+        return via
 
     def _build_search_query(
         self,

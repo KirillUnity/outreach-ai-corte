@@ -36,6 +36,32 @@ SENDER:
 Return ONLY valid JSON with two fields: "subject" and "body". No markdown, no explanations.
 Example: {{"subject": "...", "body": "..."}}"""
 
+USER_PROMPT_WITH_WARM_INTRO = """Generate a cold outreach email for the following recipient.
+
+RECIPIENT:
+- Name: {first_name} {last_name}
+- Title: {title}
+- Company: {company_name}
+
+COMPANY CONTEXT (from our research):
+{rag_context}
+
+WARM INTRO AVAILABLE:
+{mutual_connection_name} (mutual connection) knows {first_name} — you can reference this in the opening line.
+
+GOAL: {goal_description}
+TONE: {tone}
+
+SENDER:
+- Name: {sender_name}
+- Title: {sender_title}
+- Company: {sender_company}
+
+{custom_instructions}
+
+Important: Open the email with a natural mention of your mutual connection. Do not fabricate details — only use the name provided above.
+Return ONLY valid JSON with two fields: "subject" and "body"."""
+
 VALIDATION_RETRY_SUFFIX = (
     "The previous draft failed validation: {errors}. "
     "Rewrite subject and body so they pass. Still return only JSON."

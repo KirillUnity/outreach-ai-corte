@@ -30,6 +30,13 @@ React dashboard (Vite + Tailwind + `react-force-graph-2d`): [frontend/README.md]
 | http://localhost:3000/companies | Create / research |
 | http://localhost:3000/persons | LinkedIn research |
 | http://localhost:3000/graph?domain=stripe.com | Force-directed network |
+| http://localhost:3000/warm-intro | Sender UUID → uncontacted paths at a domain |
+
+### Warm Intro Paths
+
+`GET /api/v1/graph/warm-intro/search` ranks people at the target company who have **no** `EmailThread` yet. UI cards show hop count, path chips, mutuals, and influence. Company detail also lists **Recommended targets** (uncontacted + connection count) and an **influence** badge per person.
+
+The outreach agent node `enrich_with_graph` copies those signals into `graph_context`. If a named mutual exists, generation uses `USER_PROMPT_WITH_WARM_INTRO` (see [PROMPTS.md](PROMPTS.md)). Capture screenshots of `/warm-intro` and the recommended-targets card for the portfolio.
 
 Capture screenshots from those URLs for the portfolio. Browser talks to `/api/v1/...` on the same origin (nginx or Vite proxy), not to `:8080` directly.
 
@@ -335,9 +342,10 @@ Bolt UI: **http://localhost:7474** (`bolt://localhost:7687`). Heap max **512m**,
 | Recommended uncontacted targets | `GET /api/v1/graph/company/{domain}/recommended-targets` |
 | Competitors | `GET/POST /api/v1/graph/company/{domain}/competitors` |
 | Warm intro paths | `GET /api/v1/graph/person/{id}/warm-intro-paths?target_company_domain=` |
+| Warm intro search (sender → account) | `GET /api/v1/graph/warm-intro/search?sender_person_id=&target_company_domain=` |
 | Graph stats / rankings | `GET /api/v1/graph/analytics/stats`, `.../top-influencers`, `.../company-rankings` |
 
-Capture a Browser screenshot (`MATCH (n) RETURN n LIMIT 25`) for interviews. Patterns: [research/graph-query-patterns.md](research/graph-query-patterns.md). Recipes: [docs/graph-recipes.md](docs/graph-recipes.md). Why Neo4j vs CTE: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md). Schema: `get_schema_description()` in `backend/app/services/graph/schema.py`.
+Capture a Browser screenshot (`MATCH (n) RETURN n LIMIT 25`) for interviews. Patterns: [research/graph-query-patterns.md](research/graph-query-patterns.md). Recipes: [docs/graph-recipes.md](docs/graph-recipes.md). Warm intro ranking: [research/warm-intro-path-finding.md](research/warm-intro-path-finding.md). Why Neo4j vs CTE: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md). Schema: `get_schema_description()` in `backend/app/services/graph/schema.py`.
 
 ```bash
 docker compose up -d neo4j
@@ -361,4 +369,5 @@ docker stats outreach-neo4j   # stay under ~1 GB
 - Days 1–10: [docs/DAY10_SUMMARY.md](docs/DAY10_SUMMARY.md)
 - Graph Cypher patterns: [research/graph-query-patterns.md](research/graph-query-patterns.md)
 - Graph recipes: [docs/graph-recipes.md](docs/graph-recipes.md)
+- Warm intro path finding: [research/warm-intro-path-finding.md](research/warm-intro-path-finding.md)
 - Neo4j vs Postgres graph queries: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md)

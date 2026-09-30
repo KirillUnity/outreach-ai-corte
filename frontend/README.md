@@ -35,7 +35,7 @@ nginx serves the Vite build on port 3000 and proxies `/api/` to `api:8080`.
 
 - `src/api/` — typed API modules
 - `src/components/` — Layout, GraphView, UI primitives
-- `src/pages/` — Dashboard, Companies, CompanyDetail, Persons, Graph
+- `src/pages/` — Dashboard, Companies, CompanyDetail, Persons, Graph, WarmIntro
 
 ## Add a page
 

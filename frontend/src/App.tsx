@@ -5,6 +5,7 @@ import CompanyDetailPage from './pages/CompanyDetailPage'
 import Dashboard from './pages/Dashboard'
 import GraphPage from './pages/GraphPage'
 import PersonsPage from './pages/PersonsPage'
+import WarmIntroPage from './pages/WarmIntroPage'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/companies/:domain" element={<CompanyDetailPage />} />
         <Route path="/persons" element={<PersonsPage />} />
         <Route path="/graph" element={<GraphPage />} />
+        <Route path="/warm-intro" element={<WarmIntroPage />} />
       </Route>
     </Routes>
   )

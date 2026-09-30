@@ -19,6 +19,7 @@ from app.services.output_validator import OutputValidator
 from app.services.person_service import PersonService
 from app.services.graph.connections import ConnectionService
 from app.services.graph.graph_service import GraphService
+from app.services.graph.recommendations import RecommendationService
 from app.services.rag_service import RAGService
 
 logger = logging.getLogger(__name__)
@@ -126,42 +127,116 @@ async def retrieve_rag_context(
     return {"rag_context": [str(hit.get("text") or "") for hit in hits if hit.get("text")]}
 
 
+def _empty_graph_context() -> dict[str, Any]:
+    return {
+        "influence_score": 0.0,
+        "direct_connections": 0,
+        "warm_intro_available": False,
+        "warm_intro_path": [],
+        "warm_intro_distance": -1,
+        "warm_intro_via": None,
+        "warm_intro_names": "",
+        "other_decision_makers": [],
+    }
+
+
+def _person_display_name(payload: dict[str, Any] | None) -> str:
+    if not payload:
+        return ""
+    first = str(payload.get("first_name") or "")
+    last = str(payload.get("last_name") or "")
+    return f"{first} {last}".strip() or str(payload.get("name") or "")
+
+
 async def enrich_with_graph(
     state: OutreachState,
     graph_service: GraphService | None = None,
     connection_service: ConnectionService | None = None,
+    recommendation_service: RecommendationService | None = None,
 ) -> dict[str, Any]:
-    """Warm intro + influence are optional context — missing Neo4j never blocks generate."""
-    _ = graph_service
+    """Graph signals are optional — Neo4j failures never block generate."""
     person_id = state["person_id"]
     company_data = state.get("company_data") or {}
     company_domain = company_data.get("domain")
     logger.info("node=enrich_with_graph domain=%s", company_domain)
-    if connection_service is None or not company_domain:
-        return {"graph_context": {}}
+    graph_context = _empty_graph_context()
+    if not company_domain:
+        return {"graph_context": graph_context}
 
-    try:
-        paths = await connection_service.find_connection_path_to_company(
-            person_id=person_id,
-            target_company_domain=str(company_domain),
-            max_depth=4,
-        )
-        influence = await connection_service.compute_influence_score(person_id)
-    except Exception as exc:
-        logger.exception("node=enrich_with_graph failed")
-        return {"graph_context": {}, "errors": [f"graph enrich failed: {exc}"]}
+    if connection_service is not None:
+        try:
+            influence = await connection_service.compute_influence_score(person_id)
+            graph_context["influence_score"] = float(influence.get("influence_score") or 0.0)
+            graph_context["direct_connections"] = int(influence.get("direct_connections") or 0)
+        except Exception as exc:
+            logger.warning("Influence compute failed: %s", exc)
 
-    hops = paths.get("path") or []
-    names = ", ".join(str(hop.get("name") or "").strip() for hop in hops if hop.get("name"))
-    return {
-        "graph_context": {
-            "warm_intro_available": len(hops) > 0 and int(paths.get("distance") or -1) >= 0,
-            "warm_intro_distance": paths.get("distance", -1),
-            "warm_intro_names": names.strip(" ,"),
-            "influence_score": influence.get("influence_score", 0),
-            "path": hops,
-        }
-    }
+        try:
+            paths = await connection_service.find_connection_path_to_company(
+                person_id=person_id,
+                target_company_domain=str(company_domain),
+                max_depth=4,
+            )
+            hops = paths.get("path") or []
+            distance = int(paths.get("distance") if paths.get("distance") is not None else -1)
+            if hops and distance >= 0:
+                names = [str(hop.get("name") or "").strip() for hop in hops if hop.get("name")]
+                graph_context["warm_intro_available"] = True
+                graph_context["warm_intro_path"] = hops
+                graph_context["warm_intro_distance"] = distance
+                graph_context["warm_intro_names"] = ", ".join(part for part in names if part)
+                if len(hops) >= 2:
+                    graph_context["warm_intro_via"] = hops[1].get("name") if distance > 1 else hops[0].get("name")
+        except Exception as exc:
+            logger.warning("Warm intro path failed: %s", exc)
+
+    if recommendation_service is not None and not graph_context["warm_intro_available"]:
+        try:
+            hidden = await recommendation_service.find_hidden_connections(
+                person_id=person_id,
+                company_domain=str(company_domain),
+            )
+            if hidden:
+                first = hidden[0]
+                bridge = first.get("bridge") or {}
+                via = _person_display_name(bridge)
+                graph_context["warm_intro_available"] = True
+                graph_context["warm_intro_distance"] = 2
+                graph_context["warm_intro_via"] = via or None
+                graph_context["warm_intro_names"] = via
+                graph_context["warm_intro_path"] = [
+                    {
+                        "id": hop.get("id"),
+                        "name": _person_display_name(hop),
+                        "title": hop.get("title"),
+                    }
+                    for hop in (bridge, first.get("target") or {})
+                    if isinstance(hop, dict) and hop.get("id")
+                ]
+        except Exception as exc:
+            logger.warning("Warm intro search failed: %s", exc)
+
+    if graph_service is not None:
+        try:
+            top = await graph_service.get_top_decision_makers(str(company_domain), limit=5)
+            others: list[dict[str, Any]] = []
+            for row in top:
+                person = row.get("person") if isinstance(row, dict) else None
+                payload = person if isinstance(person, dict) else (row if isinstance(row, dict) else {})
+                pid = str(payload.get("id") or "")
+                if pid and pid == str(person_id):
+                    continue
+                others.append(
+                    {
+                        "name": _person_display_name(payload),
+                        "title": payload.get("title") if isinstance(payload, dict) else None,
+                    }
+                )
+            graph_context["other_decision_makers"] = others
+        except Exception as exc:
+            logger.warning("Decision makers lookup failed: %s", exc)
+
+    return {"graph_context": graph_context}
 
 
 async def generate_email_node(
@@ -182,13 +257,6 @@ async def generate_email_node(
         company = await company_service.get_by_id(person.company_id)
 
     graph_ctx = state.get("graph_context") or {}
-    custom = None
-    if graph_ctx.get("warm_intro_available"):
-        names = graph_ctx.get("warm_intro_names") or "a mutual connection"
-        custom = (
-            f"P.S. I noticed we have a mutual connection — {names}. "
-            "Would you be open to a quick intro?"
-        )
     request = EmailGenerationRequest(
         person_id=state["person_id"],
         goal=_goal(state["goal"]),
@@ -197,10 +265,11 @@ async def generate_email_node(
         sender_company=state["sender_company"],
         language="ru" if state.get("language") == "ru" else "en",
         max_words=state.get("max_words") or 120,
-        custom_instructions=custom,
     )
     try:
-        result = await email_generator.generate(person, company, request)
+        result = await email_generator.generate(
+            person, company, request, graph_context=graph_ctx
+        )
     except Exception as exc:
         logger.exception("node=generate_email failed")
         return {"errors": [f"generate failed: {exc}"], "iteration": iteration}
