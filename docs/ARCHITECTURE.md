@@ -4,7 +4,9 @@ Target: 8 GB RAM, Intel Iris Xe. Cloud LLMs only. Docker Compose only (no Kubern
 
 ```mermaid
 flowchart LR
-  Client[HTTP client] --> API[FastAPI api:8080]
+  Browser[Browser :3000] --> FE[nginx frontend]
+  FE -->|/api| API[FastAPI api:8080]
+  Client[curl / Swagger] --> API
   API --> PG[(PostgreSQL outreach)]
   API --> Chroma[(ChromaDB)]
   API --> Neo[(Neo4j Bolt)]
@@ -22,6 +24,7 @@ flowchart LR
 | Layer | Role |
 |-------|------|
 | **API** | Thin routers under `/api/v1` — companies, persons, drafts, deliverability, agent, analytics, **graph**, health |
+| **UI** | Vite/React on `:3000` — nginx + `/api` reverse proxy; no direct DB access |
 | **Services** | Site parser, LinkedIn, RAG, `LLMClient`, `EmailGenerator`, `TracingService`, `AnalyticsService`, `GraphService` |
 | **Models** | SQLAlchemy 2.0 async: Company, Person, EmailDraft, DomainHealth, AgentRun |
 | **Agent** | `OutreachState` → 10 nodes (incl. `enrich_with_graph`), conditional edges, in-process checkpointer by default |

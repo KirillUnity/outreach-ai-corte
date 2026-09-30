@@ -7,6 +7,7 @@ B2B outreach platform with AI agents. FastAPI + PostgreSQL + ChromaDB, all in Do
 - Python 3.12, FastAPI, SQLAlchemy 2.0 (async), Alembic
 - PostgreSQL 16, ChromaDB, Neo4j 5 (Bolt), Langfuse (self-hosted, optional keys)
 - Docker Compose (no Kubernetes)
+- React + Vite UI on **http://localhost:3000** (nginx in Compose; API via `/api` proxy)
 
 ## Quick start
 
@@ -16,7 +17,21 @@ docker compose build
 docker compose up -d
 docker compose exec api poetry run alembic upgrade head
 curl http://localhost:8080/api/v1/health
+# UI: http://localhost:3000
 ```
+
+## UI
+
+React dashboard (Vite + Tailwind + `react-force-graph-2d`): [frontend/README.md](frontend/README.md).
+
+| Path | Page |
+|------|------|
+| http://localhost:3000/dashboard | Graph node counts + recent companies |
+| http://localhost:3000/companies | Create / research |
+| http://localhost:3000/persons | LinkedIn research |
+| http://localhost:3000/graph?domain=stripe.com | Force-directed network |
+
+Capture screenshots from those URLs for the portfolio. Browser talks to `/api/v1/...` on the same origin (nginx or Vite proxy), not to `:8080` directly.
 
 ## API endpoints
 
