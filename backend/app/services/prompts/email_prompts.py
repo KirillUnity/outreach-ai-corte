@@ -19,6 +19,7 @@ RECIPIENT:
 - Name: {first_name} {last_name}
 - Title: {title}
 - Company: {company_name}
+- Email: {email_hint}
 
 COMPANY CONTEXT (from our research):
 {rag_context}
@@ -42,6 +43,7 @@ RECIPIENT:
 - Name: {first_name} {last_name}
 - Title: {title}
 - Company: {company_name}
+- Email: {email_hint}
 
 COMPANY CONTEXT (from our research):
 {rag_context}

@@ -8,6 +8,7 @@ import PersonsPage from './pages/PersonsPage'
 import WarmIntroPage from './pages/WarmIntroPage'
 import WarmupPage from './pages/WarmupPage'
 import MailboxDetailPage from './pages/MailboxDetailPage'
+import PersonDetailPage from './pages/PersonDetailPage'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/companies" element={<CompaniesPage />} />
         <Route path="/companies/:domain" element={<CompanyDetailPage />} />
         <Route path="/persons" element={<PersonsPage />} />
+        <Route path="/persons/:id" element={<PersonDetailPage />} />
         <Route path="/graph" element={<GraphPage />} />
         <Route path="/warm-intro" element={<WarmIntroPage />} />
         <Route path="/warmup" element={<WarmupPage />} />

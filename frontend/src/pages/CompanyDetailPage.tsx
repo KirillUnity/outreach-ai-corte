@@ -89,7 +89,9 @@ export default function CompanyDetailPage() {
               <div key={p.id} className="py-2 border-b border-slate-800 last:border-0">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-white">
-                    {p.first_name} {p.last_name}
+                    <Link to={`/persons/${p.id}`} className="text-blue-400 hover:underline">
+                      {p.first_name} {p.last_name}
+                    </Link>
                   </div>
                   <InfluenceBadge personId={p.id} />
                 </div>

@@ -12,6 +12,7 @@ from app.models.enums import EmailStatus
 
 if TYPE_CHECKING:
     from app.models.company import Company
+    from app.models.email_candidate import EmailCandidate
     from app.models.email_draft import EmailDraft
 
 
@@ -44,6 +45,10 @@ class Person(UUIDMixin, TimestampMixin, Base):
 
     company: Mapped["Company | None"] = relationship(back_populates="persons")
     email_drafts: Mapped[list["EmailDraft"]] = relationship(
+        back_populates="person",
+        cascade="all, delete-orphan",
+    )
+    email_candidates: Mapped[list["EmailCandidate"]] = relationship(
         back_populates="person",
         cascade="all, delete-orphan",
     )

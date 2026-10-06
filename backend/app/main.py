@@ -13,6 +13,7 @@ from app.api.routers import (
     companies,
     domain_health,
     email_drafts,
+    email_finder,
     graph,
     health,
     persons,
@@ -83,6 +84,7 @@ app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(companies.router, prefix="/api/v1")
 app.include_router(persons.router, prefix="/api/v1")
 app.include_router(email_drafts.router, prefix="/api/v1")
+app.include_router(email_finder.router, prefix="/api/v1")
 app.include_router(domain_health.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")

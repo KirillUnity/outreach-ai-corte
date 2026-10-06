@@ -60,6 +60,11 @@ def empty_outreach_state(
         "company_researched": False,
         "rag_context": None,
         "graph_context": None,
+        "email_found": None,
+        "email_address": None,
+        "email_confidence": None,
+        "email_source": None,
+        "email_candidates_count": 0,
         "email_subject": None,
         "email_body": None,
         "deliverability_ok": None,
@@ -121,6 +126,9 @@ class OutreachAgentService:
                 recommendation_service = RecommendationService(neo4j, connection_service)
         except Exception:
             logger.exception("neo4j wiring skipped for outreach agent")
+        from app.services.email_finder.finder import EmailFinder
+
+        email_finder = EmailFinder(self.db, self.settings)
         return build_outreach_graph(
             person_service,
             company_service,
@@ -134,6 +142,7 @@ class OutreachAgentService:
             graph_service=graph_service,
             connection_service=connection_service,
             recommendation_service=recommendation_service,
+            email_finder=email_finder,
         )
 
     async def run(

@@ -13,6 +13,7 @@ from app.services.agent.nodes import (
     check_deliverability_node,
     decide,
     enrich_with_graph,
+    find_email_node,
     generate_email_node,
     load_person_and_company,
     research_company_if_needed,
@@ -62,6 +63,7 @@ def build_outreach_graph(
     graph_service: Any = None,
     connection_service: Any = None,
     recommendation_service: Any = None,
+    email_finder: Any = None,
 ) -> Any:
     """Compile the graph. MemorySaver is the default so pytest needs no extra tables."""
     workflow: StateGraph = StateGraph(OutreachState)
@@ -97,6 +99,9 @@ def build_outreach_graph(
             state, graph_service, connection_service, recommendation_service
         )
 
+    async def find_email(state: OutreachState) -> dict:
+        return await find_email_node(state, person_service, email_finder)
+
     async def generate_email(state: OutreachState) -> dict:
         return await generate_email_node(state, email_generator, person_service, company_service)
 
@@ -121,6 +126,7 @@ def build_outreach_graph(
     workflow.add_node("research_company", _wrap("research_company", research_company))
     workflow.add_node("retrieve_rag", _wrap("retrieve_rag", retrieve_rag))
     workflow.add_node("enrich_with_graph", _wrap("enrich_with_graph", enrich_graph))
+    workflow.add_node("find_email", _wrap("find_email", find_email))
     workflow.add_node("generate_email", _wrap("generate_email", generate_email))
     workflow.add_node("validate_email", _wrap("validate_email", validate_email))
     workflow.add_node("check_deliverability", _wrap("check_deliverability", check_deliverability))
@@ -136,7 +142,8 @@ def build_outreach_graph(
     )
     workflow.add_edge("research_company", "retrieve_rag")
     workflow.add_edge("retrieve_rag", "enrich_with_graph")
-    workflow.add_edge("enrich_with_graph", "generate_email")
+    workflow.add_edge("enrich_with_graph", "find_email")
+    workflow.add_edge("find_email", "generate_email")
     workflow.add_edge("generate_email", "validate_email")
     workflow.add_conditional_edges(
         "validate_email",

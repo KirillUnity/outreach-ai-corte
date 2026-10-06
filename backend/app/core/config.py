@@ -101,6 +101,45 @@ class Neo4jSettings(BaseModel):
     auto_sync_on_write: bool = False
 
 
+class EmailFinderSettings(BaseModel):
+    """Pattern + Hunter lookup. Real SMTP RCPT is disabled (spam-probe risk)."""
+
+    enabled: bool = True
+    max_patterns_to_try: int = 10
+    common_patterns: list[str] = Field(
+        default_factory=lambda: [
+            "{first}.{last}",
+            "{first}{last}",
+            "{f}{last}",
+            "{first}_{last}",
+            "{first}",
+            "{last}.{first}",
+            "{last}{first}",
+            "{first}-{last}",
+            "{f}.{last}",
+            "{first}.{l}",
+        ]
+    )
+    smtp_enabled: bool = False
+    smtp_timeout: int = 10
+    smtp_helo_domain: str = "outreach-ai-cortex.local"
+    smtp_from_email: str = "verify@outreach-ai-cortex.local"
+    hunter_enabled: bool = False
+    hunter_api_key: str = ""
+    hunter_base_url: str = "https://api.hunter.io/v2"
+    apollo_enabled: bool = False
+    apollo_api_key: str = ""
+    min_confidence_to_save: float = 0.3
+    min_confidence_to_use: float = 0.6
+
+    @field_validator("common_patterns", mode="before")
+    @classmethod
+    def _split_patterns(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [part.strip() for part in value.split(",") if part.strip()]
+        return value
+
+
 class WarmupSettings(BaseModel):
     """In-process mailbox warmup emulator (no real SMTP)."""
 
@@ -206,7 +245,13 @@ class Settings(BaseSettings):
     neo4j: Neo4jSettings = Field(default_factory=Neo4jSettings)
     deliverability: DeliverabilitySettings = Field(default_factory=DeliverabilitySettings)
     warmup: WarmupSettings = Field(default_factory=WarmupSettings)
+    email_finder: EmailFinderSettings = Field(default_factory=EmailFinderSettings)
     graph_sync_token: str = ""
+    hunter_api_key: str = ""
+    hunter_enabled: bool = False
+    apollo_api_key: str = ""
+    apollo_enabled: bool = False
+    smtp_verification_enabled: bool = False
     # Convenience aliases so .env can use flat names from the Day 6/7 specs.
     phantombuster_api_key: str = ""
     openai_api_key: str = ""
@@ -235,6 +280,16 @@ class Settings(BaseSettings):
 
     def model_post_init(self, __context: object) -> None:
         """Copy flat env aliases into nested settings."""
+        if self.hunter_api_key and not self.email_finder.hunter_api_key:
+            self.email_finder.hunter_api_key = self.hunter_api_key
+        if self.hunter_enabled:
+            self.email_finder.hunter_enabled = True
+        if self.apollo_api_key and not self.email_finder.apollo_api_key:
+            self.email_finder.apollo_api_key = self.apollo_api_key
+        if self.apollo_enabled:
+            self.email_finder.apollo_enabled = True
+        if self.smtp_verification_enabled:
+            self.email_finder.smtp_enabled = True
         if self.phantombuster_api_key and not self.linkedin.phantombuster_api_key:
             self.linkedin.phantombuster_api_key = self.phantombuster_api_key
         self.rag.mode = self.rag_mode

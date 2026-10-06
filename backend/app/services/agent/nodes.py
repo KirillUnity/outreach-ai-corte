@@ -239,6 +239,62 @@ async def enrich_with_graph(
     return {"graph_context": graph_context}
 
 
+async def find_email_node(
+    state: OutreachState,
+    person_service: PersonService,
+    email_finder: Any | None = None,
+) -> dict[str, Any]:
+    """Lookup missing person.email. Missing candidates do not stop generate_email."""
+    person = await person_service.get_by_id(state["person_id"])
+    if person is None:
+        return {"errors": ["Person not found for email search"], "email_found": False}
+
+    raw_status = getattr(person, "email_status", "unknown")
+    status_value = getattr(raw_status, "value", raw_status)
+    if person.email and str(status_value) in {"valid", "unknown"}:
+        logger.info("node=find_email skip existing=%s", person.email)
+        return {
+            "email_found": True,
+            "email_address": person.email,
+            "email_confidence": 0.9,
+            "email_source": "linkedin",
+            "email_candidates_count": 0,
+        }
+
+    if email_finder is None:
+        return {
+            "email_found": False,
+            "email_address": person.email,
+            "email_candidates_count": 0,
+        }
+
+    domain = None
+    company_data = state.get("company_data") or {}
+    if isinstance(company_data, dict) and company_data.get("domain"):
+        domain = str(company_data["domain"])
+
+    candidates = await email_finder.find_for_person(
+        person=person,
+        domain=domain,
+        use_hunter=True,
+        use_smtp=False,
+    )
+    if not candidates:
+        return {
+            "email_found": False,
+            "email_candidates_count": 0,
+        }
+
+    primary = next((row for row in candidates if row.is_primary), candidates[0])
+    return {
+        "email_found": True,
+        "email_address": primary.email,
+        "email_confidence": primary.confidence,
+        "email_source": getattr(primary.source, "value", str(primary.source)),
+        "email_candidates_count": len(candidates),
+    }
+
+
 async def generate_email_node(
     state: OutreachState,
     email_generator: EmailGenerator,
@@ -256,7 +312,9 @@ async def generate_email_node(
     if person.company_id is not None:
         company = await company_service.get_by_id(person.company_id)
 
-    graph_ctx = state.get("graph_context") or {}
+    graph_ctx = dict(state.get("graph_context") or {})
+    graph_ctx["email_found"] = bool(state.get("email_found"))
+    graph_ctx["email_address"] = state.get("email_address")
     request = EmailGenerationRequest(
         person_id=state["person_id"],
         goal=_goal(state["goal"]),
@@ -379,6 +437,9 @@ async def save_draft_node(state: OutreachState, draft_service: EmailDraftService
                 "estimated_cost_usd": state.get("total_cost_usd"),
                 "iteration": state.get("iteration"),
                 "graph_context": state.get("graph_context") or {},
+                "email_hint": state.get("email_address")
+                if state.get("email_found")
+                else "not found — email will need manual lookup",
             },
             guardrail_results=state.get("guardrail_results") or [],
         )

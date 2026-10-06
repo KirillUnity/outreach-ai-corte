@@ -30,6 +30,9 @@ class AgentRunResponse(BaseModel):
     email_body: str | None = None
     validation_errors: list[str] = []
     deliverability_ok: bool | None = None
+    email_found: bool | None = None
+    email_address: str | None = None
+    email_source: str | None = None
     tokens_input: int = 0
     tokens_output: int = 0
     estimated_cost_usd: float = 0.0

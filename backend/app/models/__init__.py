@@ -4,6 +4,7 @@ from app.models.agent_run import AgentRun
 from app.models.base import Base
 from app.models.company import Company
 from app.models.domain_health import DomainHealth
+from app.models.email_candidate import EmailCandidate, EmailCandidateSource, EmailCandidateStatus
 from app.models.email_draft import EmailDraft
 from app.models.enums import CompanySize, EmailGoal, EmailStatus
 from app.models.mailbox import Mailbox, MailboxStatus
@@ -16,6 +17,9 @@ __all__ = [
     "Company",
     "CompanySize",
     "DomainHealth",
+    "EmailCandidate",
+    "EmailCandidateSource",
+    "EmailCandidateStatus",
     "EmailDraft",
     "EmailGoal",
     "EmailStatus",

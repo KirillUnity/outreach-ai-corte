@@ -29,6 +29,7 @@ React dashboard (Vite + Tailwind + `react-force-graph-2d`): [frontend/README.md]
 | http://localhost:3000/dashboard | Graph node counts + recent companies |
 | http://localhost:3000/companies | Create / research |
 | http://localhost:3000/persons | LinkedIn research |
+| http://localhost:3000/persons/:id | Person detail + email candidates |
 | http://localhost:3000/graph?domain=stripe.com | Force-directed network |
 | http://localhost:3000/warm-intro | Sender UUID → uncontacted paths at a domain |
 | http://localhost:3000/warmup | Mailbox warmup emulator (reputation / ticks) |
@@ -92,8 +93,28 @@ curl -s -o /dev/null -w "%{http_code}\n" -X DELETE http://localhost:8080/api/v1/
 | POST | `/persons/{person_id}/company` | 200, 404 | Bind to an existing company |
 | POST | `/persons/research` | 200, 400, 404, 422, 502 | Enrich from LinkedIn URL (mock or Phantombuster) |
 | POST | `/persons/{person_id}/generate-email` | 200, 400, 404, 502 | RAG + LLM draft, save EmailDraft |
-| POST | `/agent/outreach` | 200, 502 | LangGraph: research → generate → decide |
+| POST | `/agent/outreach` | 200, 502 | LangGraph: research → find_email → generate → decide |
 | GET | `/agent/runs` | 200 | Agent run history (`person_id`, `limit`, `offset`) |
+
+### Email Finder
+
+Pattern guesses + optional Hunter.io. **No live SMTP RCPT** (`SMTP_VERIFICATION_ENABLED=false`). Notes: [research/email-finding-strategies.md](research/email-finding-strategies.md). UI: `/persons/:id`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/email/find` | Generate/save candidates for `person_id` |
+| GET | `/email/candidates/{person_id}` | All guesses, highest confidence first |
+| POST | `/email/candidates/{id}/set-primary` | Mark primary and copy onto `Person.email` |
+| POST | `/email/candidates/{id}/verify` | Mock SMTP status |
+| DELETE | `/email/candidates/{id}` | 204 |
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/email/find \
+  -H "Content-Type: application/json" \
+  -d '{"person_id":"{person_id}","use_hunter":true,"use_smtp":false}'
+```
+
+Capture the candidates list on `/persons/:id` (source badges, confidence, PRIMARY) for the portfolio.
 
 ### Email drafts
 
@@ -285,7 +306,9 @@ flowchart TD
     load_person[load_person] -->|errors| END
     load_person --> research_company
     research_company --> retrieve_rag
-    retrieve_rag --> generate_email
+    retrieve_rag --> enrich_with_graph
+    enrich_with_graph --> find_email
+    find_email --> generate_email
     generate_email --> validate_email
     validate_email -->|dirty draft and iteration less than 2| generate_email
     validate_email --> check_deliverability
@@ -299,7 +322,9 @@ flowchart TD
 | `load_person` | Load Person + Company |
 | `research_company` | Parse/index the site if `raw_site_text` is empty |
 | `retrieve_rag` | Chroma search |
-| `generate_email` | Cloud LLM (or `LLM_MODE=mock`) |
+| `enrich_with_graph` | Warm-intro / influence into `graph_context` |
+| `find_email` | Pattern + Hunter candidates if `Person.email` is empty (does not block generate) |
+| `generate_email` | Cloud LLM (or `LLM_MODE=mock`); prompt includes `{email_hint}` |
 | `validate_email` | Spam / CAPS / forbidden phrases |
 | `check_deliverability` | SPF+DKIM snapshot for the sending domain |
 | `decide` | `send` / `hold` / `reject` |
@@ -424,4 +449,5 @@ docker stats outreach-neo4j   # stay under ~1 GB
 - Graph Cypher patterns: [research/graph-query-patterns.md](research/graph-query-patterns.md)
 - Graph recipes: [docs/graph-recipes.md](docs/graph-recipes.md)
 - Warm intro path finding: [research/warm-intro-path-finding.md](research/warm-intro-path-finding.md)
+- Email finding strategies: [research/email-finding-strategies.md](research/email-finding-strategies.md)
 - Neo4j vs Postgres graph queries: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md)

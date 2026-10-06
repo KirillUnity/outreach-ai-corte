@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { apiErrorMessage } from '../api/errors'
 import { personsApi } from '../api/persons'
 import type { Person } from '../api/types'
@@ -60,7 +61,9 @@ export default function PersonsPage() {
           {persons.map((p) => (
             <div key={p.id} className="py-3">
               <div className="text-white font-medium">
-                {p.first_name} {p.last_name}
+                <Link to={`/persons/${p.id}`} className="text-blue-400 hover:underline">
+                  {p.first_name} {p.last_name}
+                </Link>
               </div>
               <div className="text-slate-500 text-sm">
                 {p.title || '—'} {p.email && `· ${p.email}`}

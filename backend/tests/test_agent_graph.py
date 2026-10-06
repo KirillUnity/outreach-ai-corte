@@ -61,7 +61,7 @@ class _Generator:
     def _build_search_query(self, person, request, company=None) -> str:
         return f"{getattr(person, 'title', '')} {getattr(company, 'name', '')}"
 
-    async def generate(self, person, company, request):
+    async def generate(self, person, company, request, graph_context=None):
         return {
             "subject": "Idea for your billing team",
             "body": "I noticed your payments API and wanted 15 minutes to compare notes.",

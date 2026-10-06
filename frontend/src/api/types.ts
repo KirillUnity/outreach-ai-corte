@@ -129,3 +129,29 @@ export interface WarmupTickResult {
   mailboxes_warmed: number
   duration_seconds: number
 }
+
+export type EmailCandidateSource = 'pattern' | 'hunter' | 'apollo' | 'manual' | 'linkedin' | 'guess'
+export type EmailCandidateStatus = 'pending' | 'verified' | 'invalid' | 'catchall' | 'unknown'
+
+export interface EmailCandidate {
+  id: string
+  person_id: string
+  email: string
+  source: EmailCandidateSource
+  status: EmailCandidateStatus
+  confidence: number
+  pattern_used?: string
+  is_primary: boolean
+  verified_at?: string
+  verification_details?: Record<string, unknown>
+  created_at: string
+}
+
+export interface EmailFindResponse {
+  person_id: string
+  candidates: EmailCandidate[]
+  primary_email?: string
+  best_confidence: number
+  sources_used: string[]
+  duration_seconds: number
+}

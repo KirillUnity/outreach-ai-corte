@@ -218,6 +218,12 @@ class EmailGenerator:
         extra = ""
         if request.custom_instructions:
             extra = f"ADDITIONAL INSTRUCTIONS:\n{request.custom_instructions}"
+        if graph_context and graph_context.get("email_found") and graph_context.get("email_address"):
+            email_hint = f"Recipient email: {graph_context['email_address']}"
+        else:
+            email_hint = "Recipient email: not found — email will need manual lookup"
+        if person.email and email_hint.startswith("Recipient email: not found"):
+            email_hint = f"Recipient email: {person.email}"
         mutual = self._mutual_connection_name(person, graph_context)
         template = USER_PROMPT_WITH_WARM_INTRO if mutual else USER_PROMPT_TEMPLATE
         payload = {
@@ -225,6 +231,7 @@ class EmailGenerator:
             "last_name": person.last_name,
             "title": person.title or "unknown",
             "company_name": company.name if company is not None else "unknown",
+            "email_hint": email_hint,
             "rag_context": rag_context,
             "goal_description": GOAL_DESCRIPTIONS.get(request.goal, request.goal.value),
             "tone": request.tone,
