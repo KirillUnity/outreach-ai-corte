@@ -80,3 +80,52 @@ export interface WarmIntroSearchResponse {
   candidates: WarmIntroCandidate[]
   total: number
 }
+
+export type MailboxStatus = 'new' | 'warming' | 'warmed' | 'paused' | 'banned'
+
+export interface Mailbox {
+  id: string
+  email: string
+  domain: string
+  display_name?: string | null
+  status: MailboxStatus
+  warmup_day: number
+  daily_limit: number
+  emails_sent_today: number
+  total_sent: number
+  total_opened: number
+  total_replied: number
+  total_bounced: number
+  total_spam_reports: number
+  reputation_score: number
+  open_rate: number
+  reply_rate: number
+  bounce_rate: number
+  warmup_started_at?: string | null
+  last_warmup_event_at?: string | null
+  created_at: string
+}
+
+export interface WarmupEvent {
+  id: string
+  mailbox_id: string
+  peer_email: string
+  event_type: string
+  warmup_day: number
+  created_at: string
+}
+
+export interface WarmupTimelinePoint {
+  day: number
+  sent: number
+  opened: number
+  replied: number
+}
+
+export interface WarmupTickResult {
+  mailboxes_processed: number
+  events_created: number
+  mailboxes_banned: number
+  mailboxes_warmed: number
+  duration_seconds: number
+}

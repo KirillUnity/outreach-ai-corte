@@ -16,11 +16,13 @@ from app.api.routers import (
     graph,
     health,
     persons,
+    warmup,
 )
 from app.core.config import settings
-from app.core.database import engine
+from app.core.database import AsyncSessionLocal, engine
 from app.api.deps import get_neo4j_client
 from app.services.tracing import get_tracing
+from app.services.warmup.scheduler import WarmupScheduler
 
 
 @asynccontextmanager
@@ -43,8 +45,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             import logging
 
             logging.getLogger(__name__).exception("neo4j schema init skipped")
-    yield
-    get_tracing().flush()
+    scheduler = WarmupScheduler(settings)
+    await scheduler.start(AsyncSessionLocal)
+    try:
+        yield
+    finally:
+        await scheduler.stop()
+        get_tracing().flush()
     if settings.neo4j.enabled:
         client = get_neo4j_client()
         await client.close()
@@ -80,3 +87,4 @@ app.include_router(domain_health.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(graph.router, prefix="/api/v1")
+app.include_router(warmup.router, prefix="/api/v1")

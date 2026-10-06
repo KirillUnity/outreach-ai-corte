@@ -31,6 +31,7 @@ React dashboard (Vite + Tailwind + `react-force-graph-2d`): [frontend/README.md]
 | http://localhost:3000/persons | LinkedIn research |
 | http://localhost:3000/graph?domain=stripe.com | Force-directed network |
 | http://localhost:3000/warm-intro | Sender UUID → uncontacted paths at a domain |
+| http://localhost:3000/warmup | Mailbox warmup emulator (reputation / ticks) |
 
 ### Warm Intro Paths
 
@@ -140,6 +141,35 @@ Score: …/100   Risk: low
 Notes: [research/email-deliverability-2024.md](research/email-deliverability-2024.md). Nested env: `DELIVERABILITY_DNS_TIMEOUT`, `DELIVERABILITY_CACHE_TTL_SECONDS`. In-process TTL cache is per container, not shared across replicas.
 
 The LangGraph node still uses `app.services.deliverability_checker.DeliverabilityChecker` (DB snapshot). Live DNS lives in `app.services.deliverability.checker`.
+
+### Warmup (mailbox emulator)
+
+Simulated engagement against a fake peer network. **No SMTP.** One `tick` = one warmup day. In-process scheduler is off (`WARMUP_AUTO_RUN_ENABLED=false`); drive ticks from the UI, curl, or n8n (`n8n/workflows/warmup_tick.json`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/warmup/mailboxes` | Create mailbox (`NEW`, reputation 50) |
+| GET | `/warmup/mailboxes` | List (`status`, `limit`, `offset`) |
+| GET | `/warmup/mailboxes/{id}` | Detail + computed rates |
+| DELETE | `/warmup/mailboxes/{id}` | 204 |
+| POST | `/warmup/mailboxes/{id}/start` | `WARMING`, day=1 |
+| POST | `/warmup/mailboxes/{id}/pause` | Pause |
+| POST | `/warmup/mailboxes/{id}/resume` | Resume (409 if banned) |
+| POST | `/warmup/mailboxes/{id}/tick` | One simulated day |
+| POST | `/warmup/tick-all` | All `WARMING` (403 unless `DEBUG` or `X-Admin-Token`) |
+| GET | `/warmup/mailboxes/{id}/stats` | Rates + reputation |
+| GET | `/warmup/mailboxes/{id}/events` | Recent events |
+| GET | `/warmup/mailboxes/{id}/timeline` | Per-day sent/opened/replied |
+
+```bash
+docker compose exec api poetry run alembic upgrade head
+curl -s -X POST http://localhost:8080/api/v1/warmup/mailboxes \
+  -H "Content-Type: application/json" \
+  -d '{"email":"sender@yourdomain.com","display_name":"Kirill"}'
+```
+
+Notes: [research/warmup-mechanics.md](research/warmup-mechanics.md). UI: `/warmup` and `/warmup/:id` (bar chart of volume vs opens).
+
 
 ## Migrations
 

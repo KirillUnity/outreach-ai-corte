@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard'
 import GraphPage from './pages/GraphPage'
 import PersonsPage from './pages/PersonsPage'
 import WarmIntroPage from './pages/WarmIntroPage'
+import WarmupPage from './pages/WarmupPage'
+import MailboxDetailPage from './pages/MailboxDetailPage'
 
 export default function App() {
   return (
@@ -18,6 +20,8 @@ export default function App() {
         <Route path="/persons" element={<PersonsPage />} />
         <Route path="/graph" element={<GraphPage />} />
         <Route path="/warm-intro" element={<WarmIntroPage />} />
+        <Route path="/warmup" element={<WarmupPage />} />
+        <Route path="/warmup/:id" element={<MailboxDetailPage />} />
       </Route>
     </Routes>
   )

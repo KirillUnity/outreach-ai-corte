@@ -1,0 +1,123 @@
+{
+  "name": "Warmup daily tick",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 1 }]
+        }
+      },
+      "id": "schedule-warmup",
+      "name": "Every hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8080/api/v1/warmup/tick-all",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Admin-Token",
+              "value": "={{ $env.GRAPH_SYNC_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-tick-all",
+      "name": "Tick all mailboxes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.mailboxes_banned }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "if-banned",
+      "name": "Any banned?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.mailboxes_warmed }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "if-warmed",
+      "name": "Any warmed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 400]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "text": "=Warmup ban: {{ $json.mailboxes_banned }} mailbox(es) dropped below reputation threshold."
+      },
+      "id": "notify-banned",
+      "name": "Notify banned",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [960, 160],
+      "notes": "Wire credentials in n8n. Slack node is an equivalent alternative."
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "text": "=Warmed: {{ $json.mailboxes_warmed }} mailbox(es) ready for production volume."
+      },
+      "id": "notify-warmed",
+      "name": "Notify warmed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [960, 440]
+    }
+  ],
+  "connections": {
+    "Every hour": {
+      "main": [[{ "node": "Tick all mailboxes", "type": "main", "index": 0 }]]
+    },
+    "Tick all mailboxes": {
+      "main": [
+        [
+          { "node": "Any banned?", "type": "main", "index": 0 },
+          { "node": "Any warmed?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Any banned?": {
+      "main": [[{ "node": "Notify banned", "type": "main", "index": 0 }]]
+    },
+    "Any warmed?": {
+      "main": [[{ "node": "Notify warmed", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

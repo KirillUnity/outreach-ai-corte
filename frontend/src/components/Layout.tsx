@@ -6,6 +6,7 @@ const navItems = [
   { to: '/persons', label: 'Persons' },
   { to: '/graph', label: 'Graph' },
   { to: '/warm-intro', label: 'Warm Intro' },
+  { to: '/warmup', label: 'Warmup' },
 ]
 
 export default function Layout() {

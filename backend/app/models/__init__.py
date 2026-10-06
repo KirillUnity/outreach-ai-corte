@@ -6,7 +6,9 @@ from app.models.company import Company
 from app.models.domain_health import DomainHealth
 from app.models.email_draft import EmailDraft
 from app.models.enums import CompanySize, EmailGoal, EmailStatus
+from app.models.mailbox import Mailbox, MailboxStatus
 from app.models.person import Person
+from app.models.warmup_event import WarmupEvent, WarmupEventType
 
 __all__ = [
     "AgentRun",
@@ -17,5 +19,9 @@ __all__ = [
     "EmailDraft",
     "EmailGoal",
     "EmailStatus",
+    "Mailbox",
+    "MailboxStatus",
     "Person",
+    "WarmupEvent",
+    "WarmupEventType",
 ]

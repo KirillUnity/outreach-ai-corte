@@ -101,6 +101,38 @@ class Neo4jSettings(BaseModel):
     auto_sync_on_write: bool = False
 
 
+class WarmupSettings(BaseModel):
+    """In-process mailbox warmup emulator (no real SMTP)."""
+
+    enabled: bool = True
+    auto_run_enabled: bool = False
+    tick_interval_seconds: int = 3600
+    max_emails_per_tick: int = 10
+    daily_limits: list[int] = Field(
+        default_factory=lambda: (
+            [5] * 7 + [10] * 7 + [20] * 7 + [40] * 7 + [60, 60]
+        )
+    )
+    peer_open_rate: float = 0.7
+    peer_reply_rate: float = 0.15
+    peer_spam_rate: float = 0.002
+    peer_bounce_rate: float = 0.01
+    peer_important_rate: float = 0.05
+    reputation_min: float = 0.0
+    reputation_max: float = 100.0
+    reputation_ban_threshold: float = 20.0
+    reputation_warmed_threshold: float = 70.0
+    rng_seed: int | None = None
+    peer_network_size: int = 20
+
+    @field_validator("daily_limits", mode="before")
+    @classmethod
+    def _split_limits(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [int(part.strip()) for part in value.split(",") if part.strip()]
+        return value
+
+
 class DeliverabilitySettings(BaseModel):
     """Live DNS lookups for SPF / DKIM / DMARC / MX."""
 
@@ -173,6 +205,7 @@ class Settings(BaseSettings):
     prompt_ab: PromptABSettings = Field(default_factory=PromptABSettings)
     neo4j: Neo4jSettings = Field(default_factory=Neo4jSettings)
     deliverability: DeliverabilitySettings = Field(default_factory=DeliverabilitySettings)
+    warmup: WarmupSettings = Field(default_factory=WarmupSettings)
     graph_sync_token: str = ""
     # Convenience aliases so .env can use flat names from the Day 6/7 specs.
     phantombuster_api_key: str = ""
