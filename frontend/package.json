@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "vitest run",
     "preview": "vite preview --host 0.0.0.0 --port 3000"
   },
   "dependencies": {
@@ -18,9 +19,13 @@
   "devDependencies": {
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "jsdom": "^25.0.1",
     "@vitejs/plugin-react": "^4.3.1",
     "typescript": "^5.5.4",
     "vite": "^5.4.3",
+    "vitest": "^2.1.8",
     "tailwindcss": "^3.4.10",
     "postcss": "^8.4.45",
     "autoprefixer": "^10.4.20"

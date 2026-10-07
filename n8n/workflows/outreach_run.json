@@ -1,0 +1,112 @@
+{
+  "name": "Outreach agent run",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "outreach-run",
+        "responseMode": "onReceived"
+      },
+      "id": "webhook-outreach",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "notes": "Do not POST back to /crm/sync from this flow (loop: CRM → agent → CRM)."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8080/api/v1/agent/outreach",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ person_id: $json.person_id, goal: $json.goal || 'meeting', sender_name: $json.sender_name || 'Kirill', sender_title: $json.sender_title || 'Founder', sender_company: $json.sender_company || 'AI Cortex' }) }}",
+        "options": {}
+      },
+      "id": "http-outreach",
+      "name": "Run outreach agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.decision }}",
+              "value2": "hold"
+            }
+          ]
+        }
+      },
+      "id": "if-hold",
+      "name": "Decision hold?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ ($json.errors || []).length > 0 }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-error",
+      "name": "Has errors?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 420]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "text": "=Outreach HOLD person={{ $('Webhook').item.json.person_id }} reason={{ $json.decision_reason }}"
+      },
+      "id": "notify-hold",
+      "name": "Notify hold",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [960, 180],
+      "notes": "Wire Telegram/Slack credentials in n8n UI. Do not commit secrets."
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "text": "=Outreach ERROR {{ JSON.stringify($json.errors) }}"
+      },
+      "id": "notify-error",
+      "name": "Notify error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [960, 440]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Run outreach agent", "type": "main", "index": 0 }]]
+    },
+    "Run outreach agent": {
+      "main": [
+        [
+          { "node": "Decision hold?", "type": "main", "index": 0 },
+          { "node": "Has errors?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Decision hold?": {
+      "main": [[{ "node": "Notify hold", "type": "main", "index": 0 }]]
+    },
+    "Has errors?": {
+      "main": [[{ "node": "Notify error", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "templateCredsSetupCompleted": false }
+}

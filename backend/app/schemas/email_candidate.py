@@ -29,6 +29,7 @@ class EmailFindRequest(BaseModel):
     domain: str | None = Field(default=None, description="Defaults to the person's company domain")
     prefer_source: EmailCandidateSource | None = None
     use_hunter: bool = True
+    use_apollo: bool = True
     use_smtp: bool = False
 
 

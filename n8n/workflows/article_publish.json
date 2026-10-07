@@ -1,0 +1,47 @@
+{
+  "name": "Article publish tick",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 1 }]
+        }
+      },
+      "id": "schedule-articles",
+      "name": "Every hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "notes": "Day 22 queue worker: POST /api/v1/articles/tick-due. Enable after GRAPH_SYNC_TOKEN is configured in API and n8n."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8080/api/v1/articles/tick-due",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Admin-Token",
+              "value": "={{ $env.GRAPH_SYNC_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-tick-articles",
+      "name": "Tick due articles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    }
+  ],
+  "connections": {
+    "Every hour": {
+      "main": [[{ "node": "Tick due articles", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "templateCredsSetupCompleted": false }
+}

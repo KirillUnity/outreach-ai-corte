@@ -15,6 +15,7 @@ from app.models.email_candidate import EmailCandidate, EmailCandidateSource, Ema
 from app.models.enums import EmailStatus
 from app.models.person import Person
 from app.services.exceptions import NotFoundError
+from app.services.email_finder.apollo_client import ApolloClient
 from app.services.email_finder.hunter_client import HunterClient
 from app.services.email_finder.pattern_generator import PatternGenerator
 from app.services.email_finder.smtp_verifier import SMTPVerifier
@@ -29,6 +30,7 @@ class EmailFinder:
         self.pattern_gen = PatternGenerator(settings.email_finder.common_patterns)
         self.smtp = SMTPVerifier(settings)
         self.hunter = HunterClient(settings)
+        self.apollo = ApolloClient(settings)
 
     async def find_for_person(
         self,
@@ -36,6 +38,7 @@ class EmailFinder:
         domain: str | None = None,
         use_hunter: bool = True,
         use_smtp: bool = False,
+        use_apollo: bool = True,
     ) -> list[EmailCandidate]:
         if not self.settings.email_finder.enabled:
             return await self.get_candidates(person.id)
@@ -68,6 +71,22 @@ class EmailFinder:
                         existing,
                         email=str(hit["email"]),
                         source=EmailCandidateSource.HUNTER,
+                        confidence=float(hit["confidence"]),
+                        status=EmailCandidateStatus.UNKNOWN,
+                        pattern_used=None,
+                        raw=hit.get("raw") if isinstance(hit.get("raw"), dict) else None,
+                    )
+                )
+
+        if use_apollo and host and self.apollo.enabled:
+            hits = await self.apollo.match_person(person.first_name, person.last_name, host)
+            for hit in hits:
+                created.append(
+                    await self._upsert(
+                        person,
+                        existing,
+                        email=str(hit["email"]),
+                        source=EmailCandidateSource.APOLLO,
                         confidence=float(hit["confidence"]),
                         status=EmailCandidateStatus.UNKNOWN,
                         pattern_used=None,

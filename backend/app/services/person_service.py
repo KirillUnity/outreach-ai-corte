@@ -214,6 +214,49 @@ class PersonService:
         )
         return person, company, profile.source
 
+    async def ingest_search_profiles(
+        self,
+        profiles: list,
+        company_domain: str,
+    ) -> tuple[list[tuple[Person, bool]], Company | None]:
+        """Create or reuse Person rows for people-search hits (unique linkedin_url)."""
+        from app.schemas.linkedin import LinkedInProfile
+
+        companies = CompanyService(self.db)
+        company = await companies.get_by_domain(company_domain)
+        if company is None and company_domain:
+            try:
+                company = await companies.create(
+                    CompanyCreate(domain=company_domain, name=company_domain.split(".")[0].title())
+                )
+            except IntegrityError:
+                company = await companies.get_by_domain(company_domain)
+        created: list[tuple[Person, bool]] = []
+        for profile in profiles:
+            if not isinstance(profile, LinkedInProfile):
+                continue
+            url = normalize_linkedin_url(profile.linkedin_url)
+            existing = await self.get_by_linkedin(url)
+            if existing is not None:
+                if company is not None and existing.company_id is None:
+                    existing.company_id = company.id
+                    await self.db.commit()
+                    await self.db.refresh(existing)
+                created.append((existing, False))
+                continue
+            person = await self.create(
+                PersonCreate(
+                    first_name=profile.first_name,
+                    last_name=profile.last_name,
+                    linkedin_url=url,
+                    title=profile.current_title,
+                    company_id=company.id if company is not None else None,
+                    raw_linkedin_data=profile.model_dump(),
+                )
+            )
+            created.append((person, True))
+        return created, company
+
     async def _resolve_company(
         self,
         company_name: str | None,

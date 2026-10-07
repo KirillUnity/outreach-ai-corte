@@ -7,6 +7,7 @@ const navItems = [
   { to: '/graph', label: 'Graph' },
   { to: '/warm-intro', label: 'Warm Intro' },
   { to: '/warmup', label: 'Warmup' },
+  { to: '/articles', label: 'Articles' },
 ]
 
 export default function Layout() {

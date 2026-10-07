@@ -1,7 +1,8 @@
 # Outreach AI Cortex — Days 1–12 recap
 
 Study sheet: self-check questions, diagrams, interview prep.  
-Russian: [days-1-12-summary.ru.md](days-1-12-summary.ru.md).
+**Current Days 1–20 recap:** [days-1-20-summary.en.md](days-1-20-summary.en.md).  
+Russian: [days-1-12-summary.ru.md](days-1-12-summary.ru.md) · [days-1-20.ru](days-1-20-summary.ru.md).
 
 Shorter slices: [Days 1–5](days-1-5-summary.en.md) · [Days 1–8](days-1-8-summary.en.md) · [Day 10](../docs/DAY10_SUMMARY.md).
 
@@ -467,4 +468,4 @@ docker compose exec api poetry run python -m scripts.sync_to_neo4j
 | 11 | `[GRAPH]` Neo4j setup |
 | 12 | `[GRAPH]` advanced queries |
 
-Later product work: real SMTP, Postgres checkpointer in lifespan, a Campaign entity for `recommend_next_target`, React console, CRM.
+Later product work (days 13–20 already in-repo): React, live DNS, warmup, email finder, Apollo/sequences, CRM/n8n. Recap: [days-1-20-summary.en.md](days-1-20-summary.en.md). Prompts 21+: [docs/day-prompts/README.md](../docs/day-prompts/README.md).

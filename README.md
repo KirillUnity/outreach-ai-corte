@@ -33,6 +33,7 @@ React dashboard (Vite + Tailwind + `react-force-graph-2d`): [frontend/README.md]
 | http://localhost:3000/graph?domain=stripe.com | Force-directed network |
 | http://localhost:3000/warm-intro | Sender UUID → uncontacted paths at a domain |
 | http://localhost:3000/warmup | Mailbox warmup emulator (reputation / ticks) |
+| http://localhost:3000/articles | Generate, optimize, schedule, and publish article drafts |
 
 ### Warm Intro Paths
 
@@ -115,6 +116,59 @@ curl -s -X POST http://localhost:8080/api/v1/email/find \
 ```
 
 Capture the candidates list on `/persons/:id` (source badges, confidence, PRIMARY) for the portfolio.
+
+### Enrichment (Phantombuster people-search, Apollo, sequences)
+
+**Default is mock.** No LinkedIn scrape, no Instantly HTTP, no SMTP send.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/enrichment/people-search` | Deterministic people list by `company_domain` (+ optional title). Upserts Person (unique `linkedin_url`) |
+| POST | `/email/find` | `use_apollo` (default true) — Apollo people/match only if `APOLLO_ENABLED` + key |
+| POST | `/sequences/` | Create Instantly-shaped campaign (`steps` JSON, optional `mailbox_id`) |
+| GET | `/sequences/` | List |
+| POST | `/sequences/{id}/enroll` | `{person_id}` — unique per sequence |
+| POST | `/sequences/{id}/tick` | Advance `current_step` only. `emails_sent` is always 0 |
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/enrichment/people-search \
+  -H "Content-Type: application/json" \
+  -d '{"company_domain":"stripe.com","title_contains":"VP","limit":5}'
+```
+
+`LINKEDIN_MODE=mock` (default). Real people-search uses Phantombuster `LINKEDIN_PEOPLE_SEARCH_PHANTOM_ID` (or the profile phantom id) and falls back to mock on empty key / HTTP errors.
+
+### CRM (Bitrix24 / retailCRM)
+
+**Default `CRM_PROVIDER=mock`.** No vendor HTTP without `BITRIX_WEBHOOK_URL` or `RETAILCRM_API_KEY`+`RETAILCRM_BASE_URL`. The inbound Bitrix webhook path **is a secret** — never commit it.
+
+n8n is **not** in Docker Compose (RAM). Import JSON in your n8n UI: `n8n/workflows/warmup_tick.json`, `outreach_run.json`, `article_publish.json`. Credentials only in n8n, not git.
+
+Do **not** chain CRM webhook → `/agent/outreach` → `/crm/sync` (loop). Outreach workflow notes this.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/crm/sync/{person_id}` | Upsert lead; 200 `{event_id,provider,status,remote_id}`; vendor 401/timeout → 502, row still in `crm_sync_events` |
+| GET | `/crm/events?person_id=` | History. `CRM_REQUIRE_TOKEN=true` → header `X-Admin-Token` like graph sync |
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/crm/sync/{person_id}
+```
+
+### SEO articles
+
+Generation uses company RAG and always stores a draft for review. Publishing defaults to a safe
+`example.invalid` mock URL. Webhook publishing requires `CONTENT_PUBLISH_WEBHOOK_URL`; the hourly
+n8n workflow calls the admin-protected due queue.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/articles/generate` | Generate a grounded draft from company domain + keyword |
+| GET/PATCH/DELETE | `/articles/...` | List, inspect, edit, or remove drafts |
+| POST | `/articles/{id}/optimize` | Deterministic meta, keywords, and safe internal links |
+| POST | `/articles/{id}/schedule` | Queue a publication time |
+| POST | `/articles/{id}/publish` | Idempotent immediate mock/webhook publish |
+| POST | `/articles/tick-due` | Publish due rows (`X-Admin-Token`) |
 
 ### Email drafts
 
@@ -439,9 +493,15 @@ docker stats outreach-neo4j   # stay under ~1 GB
 
 - Swagger UI: http://localhost:8080/docs
 - ReDoc: http://localhost:8080/redoc
-- **Days 1–12 recap (canonical):** [RU](research/days-1-12-summary.ru.md) · [EN](research/days-1-12-summary.en.md)
+- **Days 1–27 recap (canonical):** [RU](research/days-1-27-summary.ru.md) · [EN](research/days-1-27-summary.en.md)
+- Days 1–20 historical slice: [RU](research/days-1-20-summary.ru.md) · [EN](research/days-1-20-summary.en.md)
+- Testing and coverage: [docs/TESTING.md](docs/TESTING.md)
+- Days 1–12 recap: [RU](research/days-1-12-summary.ru.md) · [EN](research/days-1-12-summary.en.md)
 - Days 1–8 recap: [RU](research/days-1-8-summary.ru.md) · [EN](research/days-1-8-summary.en.md)
 - Days 1–5 only: [RU](research/days-1-5-summary.ru.md) · [EN](research/days-1-5-summary.en.md)
+- Interview study roadmap: [docs/interview/ROADMAP.md](docs/interview/ROADMAP.md)
+- B2B deliverability notes: [research/b2b-email-deliverability.md](research/b2b-email-deliverability.md)
+- AI agents in outreach: [research/ai-agents-in-b2b-outreach.md](research/ai-agents-in-b2b-outreach.md)
 - Langfuse observability: [research/langfuse-observability-for-llm.md](research/langfuse-observability-for-llm.md)
 - Prompt catalog: [PROMPTS.md](PROMPTS.md)
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
@@ -451,3 +511,13 @@ docker stats outreach-neo4j   # stay under ~1 GB
 - Warm intro path finding: [research/warm-intro-path-finding.md](research/warm-intro-path-finding.md)
 - Email finding strategies: [research/email-finding-strategies.md](research/email-finding-strategies.md)
 - Neo4j vs Postgres graph queries: [research/neo4j-vs-postgresql-graph-queries.md](research/neo4j-vs-postgresql-graph-queries.md)
+
+## CI
+
+GitHub Actions and GitLab CI run the same mock-first backend tests and frontend build/tests used
+locally. Both use PostgreSQL 16; neither needs cloud API secrets or a GPU.
+
+```bash
+poetry run pytest -q
+cd frontend && npm ci && npm run build && npm test
+```

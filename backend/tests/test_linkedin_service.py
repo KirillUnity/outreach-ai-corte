@@ -52,6 +52,39 @@ async def test_mock_delay_called(monkeypatch: pytest.MonkeyPatch) -> None:
     assert delays == [0.4]
 
 
+async def test_people_search_deterministic() -> None:
+    svc = _svc()
+    first = await svc.search_people("stripe.com", title_contains="VP", limit=3)
+    second = await svc.search_people("stripe.com", title_contains="VP", limit=3)
+    assert len(first) == 3
+    assert [p.linkedin_url for p in first] == [p.linkedin_url for p in second]
+    assert all(p.source == "mock" for p in first)
+    assert all(p.current_title == "VP" for p in first)
+
+
+async def test_people_search_different_domains_differ() -> None:
+    svc = _svc()
+    a = await svc.search_people("acme.com", limit=1)
+    b = await svc.search_people("other.com", limit=1)
+    assert a[0].linkedin_url != b[0].linkedin_url
+
+
+async def test_people_search_real_empty_key_falls_back_to_mock() -> None:
+    svc = LinkedInService(
+        Settings(
+            linkedin=LinkedInSettings(
+                mode="real",
+                phantombuster_api_key="",
+                people_search_phantom_id="search-1",
+                mock_delay_seconds=0.01,
+            )
+        )
+    )
+    rows = await svc.search_people("stripe.com", limit=2)
+    assert len(rows) == 2
+    assert rows[0].source == "mock"
+
+
 async def test_real_mode_requires_api_key() -> None:
     svc = LinkedInService(
         Settings(

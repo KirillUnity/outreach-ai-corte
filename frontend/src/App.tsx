@@ -9,6 +9,8 @@ import WarmIntroPage from './pages/WarmIntroPage'
 import WarmupPage from './pages/WarmupPage'
 import MailboxDetailPage from './pages/MailboxDetailPage'
 import PersonDetailPage from './pages/PersonDetailPage'
+import ArticlesPage from './pages/ArticlesPage'
+import ArticleDetailPage from './pages/ArticleDetailPage'
 
 export default function App() {
   return (
@@ -24,6 +26,8 @@ export default function App() {
         <Route path="/warm-intro" element={<WarmIntroPage />} />
         <Route path="/warmup" element={<WarmupPage />} />
         <Route path="/warmup/:id" element={<MailboxDetailPage />} />
+        <Route path="/articles" element={<ArticlesPage />} />
+        <Route path="/articles/:id" element={<ArticleDetailPage />} />
       </Route>
     </Routes>
   )

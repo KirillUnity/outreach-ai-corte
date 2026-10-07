@@ -194,14 +194,35 @@ class LLMClient:
         return data
 
     def _mock_chat(self, system: str, user: str, model: str) -> dict[str, Any]:
-        """Deterministic JSON email so CI never spends tokens."""
-        subject = "Quick idea for your team"
-        body = (
-            "I noticed your team is investing in better billing workflows. "
-            "We help founders cut the time they spend on outreach research. "
-            "Would you have 15 minutes next week to compare notes?"
-        )
-        payload = json.dumps({"subject": subject, "body": body})
+        """Return deterministic structured content so CI never spends tokens."""
+        if "body_markdown" in system:
+            payload = json.dumps(
+                {
+                    "title": "A practical guide to better B2B outreach",
+                    "slug": "practical-guide-b2b-outreach",
+                    "body_markdown": (
+                        "# A practical guide to better B2B outreach\n\n"
+                        "This draft uses only the supplied company research.\n\n"
+                        "## Start with evidence\n\nUse verified context before personalization."
+                    ),
+                }
+            )
+        elif "meta_title" in system:
+            payload = json.dumps(
+                {
+                    "meta_title": "Practical B2B outreach guide",
+                    "meta_description": "Use verified research to improve B2B outreach.",
+                    "keywords": ["B2B outreach", "company research"],
+                }
+            )
+        else:
+            subject = "Quick idea for your team"
+            body = (
+                "I noticed your team is investing in better billing workflows. "
+                "We help founders cut the time they spend on outreach research. "
+                "Would you have 15 minutes next week to compare notes?"
+            )
+            payload = json.dumps({"subject": subject, "body": body})
         tokens_input = max(1, (len(system) + len(user)) // 4)
         tokens_output = max(1, len(payload) // 4)
         used_model = f"mock-{model}"

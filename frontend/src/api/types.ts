@@ -155,3 +155,31 @@ export interface EmailFindResponse {
   sources_used: string[]
   duration_seconds: number
 }
+
+export type ArticleStatus = 'draft' | 'ready' | 'scheduled' | 'published' | 'failed'
+
+export interface SEOArticle {
+  id: string
+  company_id?: string | null
+  title: string
+  slug: string
+  body_markdown: string
+  language: string
+  status: ArticleStatus
+  keywords: string[]
+  keyword_primary?: string | null
+  meta_title?: string | null
+  meta_description?: string | null
+  internal_links: Array<{ anchor: string; url: string }>
+  rag_context_used: Array<Record<string, unknown>>
+  tokens_input: number
+  tokens_output: number
+  estimated_cost_usd: string
+  generation_prompt_version: string
+  scheduled_at?: string | null
+  published_at?: string | null
+  publish_channel: 'mock' | 'webhook'
+  publish_url?: string | null
+  created_at: string
+  updated_at: string
+}

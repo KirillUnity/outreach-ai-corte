@@ -10,13 +10,17 @@ from sqlalchemy import text
 from app.api.routers import (
     agent,
     analytics,
+    articles,
     companies,
+    crm,
     domain_health,
     email_drafts,
     email_finder,
+    enrichment,
     graph,
     health,
     persons,
+    sequences,
     warmup,
 )
 from app.core.config import settings
@@ -81,10 +85,14 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
+app.include_router(articles.router, prefix="/api/v1")
 app.include_router(companies.router, prefix="/api/v1")
 app.include_router(persons.router, prefix="/api/v1")
 app.include_router(email_drafts.router, prefix="/api/v1")
 app.include_router(email_finder.router, prefix="/api/v1")
+app.include_router(enrichment.router, prefix="/api/v1")
+app.include_router(sequences.router, prefix="/api/v1")
+app.include_router(crm.router, prefix="/api/v1")
 app.include_router(domain_health.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")

@@ -1,0 +1,47 @@
+stages:
+  - test
+  - build
+
+variables:
+  DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/outreach_test
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  POSTGRES_DB: outreach_test
+  LLM_MODE: mock
+  RAG_MODE: mock
+  LINKEDIN_MODE: mock
+  NEO4J_ENABLED: "false"
+  LANGFUSE_ENABLED: "false"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+backend:
+  stage: test
+  image: python:3.12-slim
+  services:
+    - name: postgres:16
+      alias: postgres
+  cache:
+    paths:
+      - .cache/pip
+  before_script:
+    - pip install poetry
+    - poetry install --no-interaction --no-root
+  script:
+    - poetry run alembic -c backend/alembic.ini upgrade head
+    - poetry run pytest -q
+
+frontend:
+  stage: build
+  image: node:20-alpine
+  cache:
+    key:
+      files:
+        - frontend/package-lock.json
+    paths:
+      - .npm/
+  before_script:
+    - cd frontend
+    - npm ci --cache ../.npm --prefer-offline
+  script:
+    - npm run build
+    - npm test

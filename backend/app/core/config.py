@@ -129,6 +129,7 @@ class EmailFinderSettings(BaseModel):
     hunter_base_url: str = "https://api.hunter.io/v2"
     apollo_enabled: bool = False
     apollo_api_key: str = ""
+    apollo_base_url: str = "https://api.apollo.io/api/v1"
     min_confidence_to_save: float = 0.3
     min_confidence_to_use: float = 0.6
 
@@ -208,10 +209,31 @@ class LinkedInSettings(BaseModel):
     mode: Literal["mock", "real"] = "mock"
     phantombuster_api_key: str = ""
     phantombuster_phantom_id: str = ""
+    people_search_phantom_id: str = ""
     base_url: str = "https://api.phantombuster.com/api/v2"
     mock_delay_seconds: float = 0.2
     poll_interval_seconds: float = 3.0
     max_poll_attempts: int = 20
+
+
+class CrmSettings(BaseModel):
+    """Outbound CRM upsert. Default mock — no vendor calls without URL/key."""
+
+    enabled: bool = True
+    provider: Literal["mock", "bitrix24", "retailcrm"] = "mock"
+    webhook_url: str = ""
+    webhook_token: str = ""
+    api_key: str = ""
+    base_url: str = ""
+    require_token: bool = False
+    timeout_seconds: float = 15.0
+
+
+class ContentSettings(BaseModel):
+    """Outbound publishing configuration; mock channel needs no secrets."""
+
+    publish_webhook_url: str = ""
+    timeout_seconds: float = 15.0
 
 
 class Settings(BaseSettings):
@@ -246,12 +268,17 @@ class Settings(BaseSettings):
     deliverability: DeliverabilitySettings = Field(default_factory=DeliverabilitySettings)
     warmup: WarmupSettings = Field(default_factory=WarmupSettings)
     email_finder: EmailFinderSettings = Field(default_factory=EmailFinderSettings)
+    crm: CrmSettings = Field(default_factory=CrmSettings)
+    content: ContentSettings = Field(default_factory=ContentSettings)
     graph_sync_token: str = ""
     hunter_api_key: str = ""
     hunter_enabled: bool = False
     apollo_api_key: str = ""
     apollo_enabled: bool = False
     smtp_verification_enabled: bool = False
+    bitrix_webhook_url: str = ""
+    retailcrm_api_key: str = ""
+    retailcrm_base_url: str = ""
     # Convenience aliases so .env can use flat names from the Day 6/7 specs.
     phantombuster_api_key: str = ""
     openai_api_key: str = ""
@@ -290,6 +317,12 @@ class Settings(BaseSettings):
             self.email_finder.apollo_enabled = True
         if self.smtp_verification_enabled:
             self.email_finder.smtp_enabled = True
+        if self.bitrix_webhook_url and not self.crm.webhook_url:
+            self.crm.webhook_url = self.bitrix_webhook_url
+        if self.retailcrm_api_key and not self.crm.api_key:
+            self.crm.api_key = self.retailcrm_api_key
+        if self.retailcrm_base_url and not self.crm.base_url:
+            self.crm.base_url = self.retailcrm_base_url
         if self.phantombuster_api_key and not self.linkedin.phantombuster_api_key:
             self.linkedin.phantombuster_api_key = self.phantombuster_api_key
         self.rag.mode = self.rag_mode

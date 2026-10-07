@@ -1,7 +1,8 @@
 # Outreach AI Cortex — итоги дней 1–12
 
 Шпаргалка: самопроверка, схемы, подготовка к собеседованию.  
-English: [days-1-12-summary.en.md](days-1-12-summary.en.md).
+**Актуальный срез дней 1–20:** [days-1-20-summary.ru.md](days-1-20-summary.ru.md).  
+English: [days-1-12-summary.en.md](days-1-12-summary.en.md) · [days-1-20.en](days-1-20-summary.en.md).
 
 Детальнее по срезам: [дни 1–5](days-1-5-summary.ru.md) · [дни 1–8](days-1-8-summary.ru.md) · [день 10 (EN)](../docs/DAY10_SUMMARY.md).
 
@@ -467,4 +468,4 @@ docker compose exec api poetry run python -m scripts.sync_to_neo4j
 | 11 | `[GRAPH]` Neo4j setup |
 | 12 | `[GRAPH]` advanced queries |
 
-Дальше по продукту: реальный SMTP, Postgres-checkpointer в lifespan, Campaign-сущность для `recommend_next_target`, React-консоль, CRM.
+Дальше по продукту (дни 13–20 уже в репо): React, DNS deliverability, warmup, email finder, Apollo/sequences, CRM/n8n. Сводка: [days-1-20-summary.ru.md](days-1-20-summary.ru.md). Промпты 21+: [docs/day-prompts/README.md](../docs/day-prompts/README.md).

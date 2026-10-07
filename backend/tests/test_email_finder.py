@@ -11,6 +11,8 @@ from app.models.email_candidate import EmailCandidate, EmailCandidateSource
 from app.models.enums import EmailStatus
 from app.models.person import Person
 from app.services.email_finder.finder import EmailFinder
+from app.services.email_finder.smtp_verifier import SMTPVerifier
+from app.core.config import Settings
 
 
 class _MemDb:
@@ -145,3 +147,24 @@ async def test_set_primary_updates_person() -> None:
     assert updated.is_primary is True
     assert person.email == other.email
     assert sum(1 for row in finder.db.rows if row.is_primary) == 1  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_finder_creates_apollo_candidate() -> None:
+    person = _person()
+    finder = _finder(person)
+
+    async def apollo_hit(_fn: str, _ln: str, _domain: str):
+        return [{"email": "ada.unique@stripe.com", "confidence": 0.85, "source": "apollo", "raw": {}}]
+
+    finder.apollo.enabled = True
+    finder.apollo.match_person = apollo_hit  # type: ignore[method-assign]
+    rows = await finder.find_for_person(person, use_apollo=True)  # type: ignore[arg-type]
+    assert any(row.source == EmailCandidateSource.APOLLO for row in rows)
+    assert any(row.email == "ada.unique@stripe.com" for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_smtp_verifier_disabled_never_probes_network() -> None:
+    result = await SMTPVerifier(Settings()).verify("lead@example.com")
+    assert result == {"status": "unknown", "reason": "SMTP disabled", "mx_host": None}

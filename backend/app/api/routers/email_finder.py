@@ -41,6 +41,7 @@ async def find_email(
         person,
         domain=data.domain,
         use_hunter=data.use_hunter,
+        use_apollo=data.use_apollo,
         use_smtp=data.use_smtp,
     )
     if data.prefer_source is not None:
