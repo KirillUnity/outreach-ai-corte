@@ -32,6 +32,8 @@ langgraph-checkpoint-postgres = "^2.0.13"
 langfuse = ">=2.60.0,<3"
 dnspython = "^2.7.0"
 neo4j = "^5.26.0"
+sentry-sdk = { extras = ["fastapi"], version = "^2.19.0" }
+prometheus-client = "^0.21.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
@@ -48,6 +50,9 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
 
 [tool.mypy]
 python_version = "3.12"

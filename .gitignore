@@ -242,3 +242,7 @@ Thumbs.db
 # Chroma / data
 chroma_data/
 postgres_data/
+
+# Demo recordings stay local. Checklists live in docs/demo/.
+*.mp4
+*.mov

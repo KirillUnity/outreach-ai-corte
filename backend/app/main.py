@@ -1,12 +1,13 @@
 """FastAPI application entry point."""
 
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.api.deps import get_neo4j_client
 from app.api.routers import (
     agent,
     analytics,
@@ -19,13 +20,15 @@ from app.api.routers import (
     enrichment,
     graph,
     health,
+    metrics,
     persons,
     sequences,
     warmup,
 )
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, engine
-from app.api.deps import get_neo4j_client
+from app.services.metrics import PrometheusMiddleware
+from app.services.sentry_setup import configure_sentry
 from app.services.tracing import get_tracing
 from app.services.warmup.scheduler import WarmupScheduler
 
@@ -35,9 +38,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     Application lifespan: verify DB on startup, cleanup on shutdown.
 
-    Startup  → ping PostgreSQL (fail fast if unreachable)
+    Startup  → optional Sentry, then ping PostgreSQL (fail fast if unreachable)
     Shutdown → dispose connection pool
     """
+    configure_sentry(settings)
     async with engine.begin() as conn:
         await conn.execute(text("SELECT 1"))
     if settings.neo4j.enabled:
@@ -83,8 +87,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(PrometheusMiddleware)
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
+app.include_router(metrics.router)
 app.include_router(articles.router, prefix="/api/v1")
 app.include_router(companies.router, prefix="/api/v1")
 app.include_router(persons.router, prefix="/api/v1")

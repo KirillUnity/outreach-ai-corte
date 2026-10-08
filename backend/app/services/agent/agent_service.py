@@ -22,6 +22,7 @@ from app.services.domain_health_service import DomainHealthService
 from app.services.email_draft_service import EmailDraftService
 from app.services.email_generator import EmailGenerator
 from app.services.llm_client import LLMClient
+from app.services.metrics import note_agent_run
 from app.services.output_validator import OutputValidator
 from app.services.person_service import PersonService
 from app.services.rag_service import RAGService
@@ -188,6 +189,7 @@ class OutreachAgentService:
             self.tracing.flush()
             self.tracing.unbind_trace(token)
         await self._persist_run(result, duration)
+        note_agent_run(str(result.get("decision") or "unknown"))
         self.alerts.check_cost_threshold(float(result.get("total_cost_usd") or 0.0))
         error_n = len(result.get("errors") or [])
         self.alerts.check_error_rate(error_n, 1)

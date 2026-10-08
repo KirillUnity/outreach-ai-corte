@@ -2,6 +2,8 @@
 
 B2B outreach platform with AI agents. FastAPI + PostgreSQL + ChromaDB, all in Docker Compose.
 
+Portfolio walkthrough: [10-minute demo](docs/DEMO.md). System map: [Architecture](docs/ARCHITECTURE.md).
+
 ## Stack
 
 - Python 3.12, FastAPI, SQLAlchemy 2.0 (async), Alembic
@@ -505,6 +507,9 @@ docker stats outreach-neo4j   # stay under ~1 GB
 - Langfuse observability: [research/langfuse-observability-for-llm.md](research/langfuse-observability-for-llm.md)
 - Prompt catalog: [PROMPTS.md](PROMPTS.md)
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- 10-minute demo: [docs/DEMO.md](docs/DEMO.md)
+- VPS Compose deploy: [docs/DEPLOY.md](docs/DEPLOY.md)
+- Observability: [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)
 - Days 1–10: [docs/DAY10_SUMMARY.md](docs/DAY10_SUMMARY.md)
 - Graph Cypher patterns: [research/graph-query-patterns.md](research/graph-query-patterns.md)
 - Graph recipes: [docs/graph-recipes.md](docs/graph-recipes.md)

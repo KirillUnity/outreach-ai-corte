@@ -27,6 +27,7 @@ All LLM-facing strings live in `backend/app/services/prompts/email_prompts.py`. 
 | `{tone}` | Defaults in the HTTP schema, not here |
 | `{sender_*}` | Unsigned letter |
 | `{custom_instructions}` | Empty string; used for validator/guardrail retries |
+| `{email_hint}` | Built in `EmailGenerator`, not by the HTTP client. If the graph already found an address, the line is `Recipient email: {address}`. Otherwise `Recipient email: not found — email will need manual lookup`. A stored `Person.email` fills that gap. The model must not invent a different address. |
 
 **Expected output:** JSON object only, no markdown fences (parser strips fences as a fallback).
 
@@ -37,7 +38,30 @@ Same variables as `USER_PROMPT_TEMPLATE`, plus `{mutual_connection_name}`.
 - **Purpose:** Only used when `graph_context.warm_intro_available` is true **and** we have a real name (not “a mutual connection”). Forces the opener to mention that person and forbids invented intro details.
 - **Good:** “Ada mentioned you are hiring a RevOps lead…”
 - **Bad:** Inventing that Ada works at Stripe or that you had lunch last week.
-- **Changelog:** v1.3 added for Day 14 graph personalization.
+- **Changelog:** v1.3 added for Day 14 graph personalization. `{email_hint}` is on this template too.
+
+## Article prompts (`article-v1`)
+
+Source: `backend/app/services/prompts/article_prompts.py`. Constant `ARTICLE_PROMPT_VERSION = "article-v1"`. Separate from the email catalog.
+
+### article_system (`SYSTEM_PROMPT_ARTICLE`)
+
+- **Purpose:** Factual B2B SEO draft. Facts only from RAG. If context is missing, the model must say company-specific claims need editorial review.
+- **Variables:** `{max_words}`, `{language}`
+- **Expected output:** One JSON object: `title`, `slug`, `body_markdown`. Slug is lowercase ASCII kebab-case.
+- **Good:** One H1, clear H2s, no invented customers or metrics.
+- **Bad:** Awards, quotes, or URLs that are not in the context. URL shorteners.
+
+### article_user (`USER_PROMPT_ARTICLE`)
+
+| Variable | If omitted |
+|----------|------------|
+| `{company_name}` | The article cannot stay grounded |
+| `{keyword}` | No SEO target |
+| `{language}` `{max_words}` | Generator always passes them (default language `ru`, 800 words on the HTTP schema) |
+| `{rag_context}` | Model must refuse invented company facts |
+
+**Changelog:** article-v1 initial. Optimize (`POST /articles/{id}/optimize`) does not call this prompt; it fills meta fields in code.
 
 ### Validation / guardrail retries
 
@@ -69,7 +93,16 @@ Same variables as `USER_PROMPT_TEMPLATE`, plus `{mutual_connection_name}`.
 | v1.2 | Guardrail retry copy | `guardrails/failures`, reject rate |
 | v1.3 | Warm-intro user prompt | `generation_context.graph_context`, reply rate |
 
-A/B: `PROMPT_AB_ENABLED=true` picks `v1_default` vs `v1_direct_cta` (`app.services.prompt_ab`). Log `prompt_variant` on Langfuse generations. Keep A/B **off** in CI.
+## Prompt A/B
+
+`PromptABTester` in `backend/app/services/prompt_ab.py` is real. It is off unless `PROMPT_AB_ENABLED=true` (`PromptABSettings.enabled`, default false) so CI stays deterministic. There is no separate experiment service and no stored assignment table.
+
+| Variant | Suffix appended to the user prompt |
+|---------|--------------------------------------|
+| `v1_default` | empty |
+| `v1_direct_cta` | Prefer a single concrete CTA with a 15-minute window. Do not stack questions. |
+
+`pick_variant` chooses with equal weights. `log_result` keeps in-process trials, success rate, and average score. Log `prompt_variant` on Langfuse generations when tracing is on. Keep A/B **off** in CI.
 
 ## Why this file exists
 

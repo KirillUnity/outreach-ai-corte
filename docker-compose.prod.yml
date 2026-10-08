@@ -1,0 +1,215 @@
+# Production Compose for a single VPS. Not Kubernetes.
+# Default `up` starts api + postgres + frontend only.
+# Chroma:  docker compose -f docker-compose.prod.yml --profile rag up -d
+# Neo4j and Langfuse: --profile extra  (off on a 1 GB VPS)
+# Project name isolates volumes from the dev compose file in this directory.
+
+name: outreach-prod
+
+x-logging: &json-log
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: outreach-prod-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-outreach}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    mem_limit: 512m
+    networks:
+      - outreach-network
+    logging: *json-log
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-outreach}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    image: outreach-api:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: outreach-prod-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Loopback only. The browser uses the frontend on :3000, which proxies /api.
+    ports:
+      - "127.0.0.1:8080:8080"
+    mem_limit: 512m
+    networks:
+      - outreach-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *json-log
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/metrics"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  frontend:
+    image: outreach-frontend:${IMAGE_TAG:-local}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: outreach-prod-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3000:3000"
+    mem_limit: 64m
+    networks:
+      - outreach-network
+    depends_on:
+      api:
+        condition: service_healthy
+    logging: *json-log
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  chromadb:
+    profiles: ["rag"]
+    image: chromadb/chroma:0.5.23
+    container_name: outreach-prod-chromadb
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+      ALLOW_RESET: "FALSE"
+    volumes:
+      - chroma_data:/chroma/chroma
+    mem_limit: 256m
+    networks:
+      - outreach-network
+    logging: *json-log
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/heartbeat')\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  neo4j:
+    profiles: ["extra"]
+    image: neo4j:5-community
+    container_name: outreach-prod-neo4j
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    mem_limit: 768m
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-change-me-please-strong-password}
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 128m
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - outreach-network
+    logging: *json-log
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  langfuse-db:
+    profiles: ["extra"]
+    image: postgres:16-alpine
+    container_name: outreach-prod-langfuse-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse_db_data:/var/lib/postgresql/data
+    mem_limit: 256m
+    networks:
+      - outreach-network
+    logging: *json-log
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  langfuse:
+    profiles: ["extra"]
+    image: langfuse/langfuse:2
+    container_name: outreach-prod-langfuse
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3001:3000"
+    mem_limit: 512m
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-change-me-in-production-please-32ch}
+      SALT: ${LANGFUSE_SALT:-change-me-too-please-use-32chars}
+      NEXTAUTH_URL: ${LANGFUSE_PUBLIC_URL:-http://127.0.0.1:3001}
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+    networks:
+      - outreach-network
+    logging: *json-log
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/api/public/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+
+volumes:
+  postgres_data:
+  chroma_data:
+  langfuse_db_data:
+  neo4j_data:
+  neo4j_logs:
+
+networks:
+  outreach-network:
+    name: outreach-prod-network

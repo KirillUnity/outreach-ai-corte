@@ -250,6 +250,11 @@ class Settings(BaseSettings):
     app_name: str = "Outreach AI Cortex"
     debug: bool = False
 
+    # Observability. Empty DSN skips Sentry. Metrics are a scrape endpoint, not a local Prometheus.
+    sentry_dsn: str = ""
+    sentry_enabled: bool = False
+    prometheus_enabled: bool = True
+
     # PostgreSQL (async SQLAlchemy)
     database_url: str = "postgresql+asyncpg://postgres:postgres@postgres:5432/outreach"
 
