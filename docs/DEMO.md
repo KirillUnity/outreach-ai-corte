@@ -2,6 +2,8 @@
 
 Mock mode spends no tokens. Say "mock" when a step is not calling a vendor. UI: http://localhost:3000. API: http://localhost:8080/api/v1. Swagger: http://localhost:8080/docs.
 
+Five-minute recording: [demo/VIDEO_SCRIPT.md](demo/VIDEO_SCRIPT.md) and [demo/CAPTURE.md](demo/CAPTURE.md). Host the video unlisted on YouTube; do not commit mp4. Still checklist: [demo/SCREENSHOTS.md](demo/SCREENSHOTS.md). Metrics: [PROJECT_METRICS.md](PROJECT_METRICS.md). Changelog: [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
 ```bash
 cp .env.example .env
 docker compose up -d

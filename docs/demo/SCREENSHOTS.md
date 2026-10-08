@@ -1,6 +1,6 @@
 # Screenshot checklist
 
-Capture these yourself. This folder does not store PNG, GIF, or video files. Frame size **1920×1080**. Do not show `.env`, API keys, webhook URLs, or the Neo4j password. Close the editor if a secret is on screen.
+Capture these yourself. Recording steps: [CAPTURE.md](CAPTURE.md). This folder does not store PNG, GIF, or video files unless you add small stills later. Frame size **1920×1080**. Do not show `.env`, API keys, webhook URLs, or the Neo4j password. Close the editor if a secret is on screen.
 
 Suggested filenames (create them locally; do not commit large binaries):
 

@@ -37,8 +37,10 @@
 | 12 | [c12-day32-demo-assets.md](c12-day32-demo-assets.md) | 32+33 | Скрины/GIF + сценарий 5-мин видео |
 | 13 | [c13-day34-interview.md](c13-day34-interview.md) | 34 | Ответы под ваши отклики |
 | 14 | [c14-day35-ship.md](c14-day35-ship.md) | 35 | Пуш, пост, метрики репо |
+| — | [c15-day25-content-marketing.md](c15-day25-content-marketing.md) | **25 restored** | Content-marketing essay (markdown only) |
+| — | [c16-day30-locust.md](c16-day30-locust.md) | **30 restored** | Locust read-only, RAM-safe (not in Compose) |
 
-**Пропущены в полном хвосте 35 дней:** 25 (эссе контент-маркетинг), 30 (Locust). Вернуть можно отдельным чатом, в этот пакет не входят.
+**Days 25 and 30** were skipped in the original 14-prompt pack and are **no longer unimplemented**. Capture notes for day 33 live in `docs/demo/CAPTURE.md` (c12 still owns the checklist + script).
 
 ## Правила для всех дней
 

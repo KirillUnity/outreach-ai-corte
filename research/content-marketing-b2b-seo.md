@@ -1,0 +1,30 @@
+# Content marketing and B2B SEO (interview essay)
+
+Related: [article lifecycle in the 1–35 recap](days-1-35-summary.en.md), [PROMPTS.md](../PROMPTS.md), [n8n/workflows/article_publish.json](../n8n/workflows/article_publish.json). Cortex is not a “CyberArticles” clone; it is a small editorial loop on the same company research that already powers outreach.
+
+**Self-check:** generation must stop at draft so a human owns publish. Meta length is bounded because SERP snippets truncate and unbounded LLM titles overflow. Internal links stay on the same company so we never inject competitor or invented URLs.
+
+---
+
+Outreach teams and content marketers often look like two products. One sends a first email. The other publishes a page that should rank for a keyword. In Cortex they share one research corpus. A company row stores `raw_site_text`. Research fetches the public site, splits it, and indexes chunks in Chroma. The outreach agent retrieves those chunks when it drafts an email. The article factory retrieves the same chunks when it drafts a page. You pay for fetch and embedding once. You do not scrape LinkedIn for SEO, and you do not invent a second knowledge base “for marketing.”
+
+That shared corpus is the honest answer to “why is an article attached to a Company, not a Person?” A person is a recipient. A company is the entity whose site, products, and domain you are allowed to talk about. Grounding a keyword article in person-level gossip would mix personalization with public claims. Grounding it in company RAG keeps the editorial claim: this text is about the account we researched.
+
+The editorial loop is the other half of the product. Generate always persists `SEOArticle` in **draft**. It never POSTs to a CMS. An operator reads the markdown, edits, and optionally runs optimize. Optimize fills a meta title (truncated to 60 characters), a meta description (160), a short keyword list, and at most three internal links. Publish is a separate action: the default channel writes a mock URL on `example.invalid`; a webhook channel is used only when `CONTENT_PUBLISH_WEBHOOK_URL` is set. Scheduling puts a due time on the row. An admin tick (`POST /articles/tick-due`) or the hourly n8n workflow `article_publish.json` publishes due drafts. Repeat publish is a no-op. Failed webhooks mark the row failed. Nothing in this loop is “auto-spam the internet.”
+
+Why must generation stop at draft? Because retrieval-augmented generation still hallucinates. Empty Chroma context is explicit in the prompt (“no indexed company research”), and the generator appends an editorial note, but a model can still invent a product name, a statistic, or a CTA URL. A human is the publisher of record. Auto-publish would turn a portfolio demo into an unreviewed content firehose. The same rule exists on outreach: `AGENT_REQUIRE_HUMAN_APPROVAL` defaults to true, and `save_and_send` does not open SMTP. Content marketing copied that hold.
+
+How Cortex models the pieces:
+
+- **`SEOArticle`** is the SQLAlchemy row: title, slug, body, keyword, status, RAG snippets used, token/cost metadata, SEO fields, internal links. Status moves draft → scheduled → published (or failed). It belongs to `company_id`.
+- **`ArticleGenerator`** loads the company, retrieves Chroma hits for the keyword, fills versioned JSON prompts (`SYSTEM_PROMPT_ARTICLE` / `USER_PROMPT_ARTICLE`), validates structured output, and saves a draft. Mock LLM mode keeps CI deterministic.
+- **`SeoOptimizer`** is deterministic by default. It does not need a second model call. Optional `use_llm` may rewrite metadata, then the same truncators run again. Keywords are de-duplicated and capped. Internal links are the company homepage plus up to two other articles **for the same company**.
+- **`article_publish.json`** is not a Compose service. You import it into your own n8n. It calls the admin-protected tick with `X-Admin-Token` from n8n env, not from git.
+
+Honest limits. Publish is mock unless you configure a webhook; there is no WordPress or Ghost adapter in this repo. RAG can still miss the right chunk or retrieve boilerplate. The host is an 8 GB laptop with Intel Iris Xe (128 MB VRAM). Local models (Ollama, transformers, PyTorch, TensorFlow) are out of scope. Production LLM and embeddings are cloud APIs. On a 1 GB VPS, Chroma is an optional Compose profile; without it, health reports Chroma down and research cannot index. n8n is JSON on disk, not another RAM tax in Compose. We do not claim this is the world’s first agent, and we do not claim live Hunter/Apollo/CMS traffic in the default demo.
+
+A content-marketing or “CyberArticles-style” interview will not ask you to recite LangChain class names. It will ask whether the draft is grounded, whether the CTA is one clear next step, and whether internal links are safe. Grounding: show `rag_context_used` on the article, the disclaimer when retrieval is empty, and JSON validation instead of raw markdown from the model. CTA: one ask in the body (subscribe, book a call, read the product page) — not three competing buttons. Internal links: same company domain and stored article paths only. Off-domain “recommended reading” is how spam networks launder PageRank and how a hallucinated URL ships.
+
+Why bound meta length? Google and social scrapers truncate. An unbounded title looks clever in the admin UI and broken in the SERP. Truncation is a product rule, not a model preference. Why same-company links only? Because the optimizer must not become a link injector. Competitor domains, shorteners, and invented paths are out. The homepage plus sibling drafts is a conservative graph: enough to demo internal linking, not enough to build a spam farm.
+
+If you have three minutes on a screening call, say this: we research a company once; outreach and SEO both retrieve from Chroma; generate is draft-only; a human optimizes; publish is mock or webhook; meta and links are bounded on purpose. Then offer to walk `/articles` or the OpenAPI article routes. That is the content-marketing story. It is the same Cortex stack as the cold email, with an editorial hold instead of a send hold.

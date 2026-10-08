@@ -3,6 +3,8 @@
 B2B outreach platform with AI agents. FastAPI + PostgreSQL + ChromaDB, all in Docker Compose.
 
 Portfolio walkthrough: [10-minute demo](docs/DEMO.md). System map: [Architecture](docs/ARCHITECTURE.md).
+Ship notes: [Release notes](docs/RELEASE_NOTES.md) · [Project metrics](docs/PROJECT_METRICS.md).
+Video capture (human): [docs/demo/CAPTURE.md](docs/demo/CAPTURE.md).
 
 ## Stack
 
@@ -495,7 +497,8 @@ docker stats outreach-neo4j   # stay under ~1 GB
 
 - Swagger UI: http://localhost:8080/docs
 - ReDoc: http://localhost:8080/redoc
-- **Days 1–27 recap (canonical):** [RU](research/days-1-27-summary.ru.md) · [EN](research/days-1-27-summary.en.md)
+- **Days 1–35 recap (canonical):** [RU](research/days-1-35-summary.ru.md) · [EN](research/days-1-35-summary.en.md)
+- Days 1–27 historical slice: [RU](research/days-1-27-summary.ru.md) · [EN](research/days-1-27-summary.en.md)
 - Days 1–20 historical slice: [RU](research/days-1-20-summary.ru.md) · [EN](research/days-1-20-summary.en.md)
 - Testing and coverage: [docs/TESTING.md](docs/TESTING.md)
 - Days 1–12 recap: [RU](research/days-1-12-summary.ru.md) · [EN](research/days-1-12-summary.en.md)
@@ -508,6 +511,11 @@ docker stats outreach-neo4j   # stay under ~1 GB
 - Prompt catalog: [PROMPTS.md](PROMPTS.md)
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 10-minute demo: [docs/DEMO.md](docs/DEMO.md)
+- Demo capture (day 33): [docs/demo/CAPTURE.md](docs/demo/CAPTURE.md)
+- Release notes: [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
+- Project metrics: [docs/PROJECT_METRICS.md](docs/PROJECT_METRICS.md)
+- Content marketing essay: [research/content-marketing-b2b-seo.md](research/content-marketing-b2b-seo.md)
+- Load testing (Locust, optional): [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md)
 - VPS Compose deploy: [docs/DEPLOY.md](docs/DEPLOY.md)
 - Observability: [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)
 - Days 1–10: [docs/DAY10_SUMMARY.md](docs/DAY10_SUMMARY.md)
