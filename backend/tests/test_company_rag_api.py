@@ -1,16 +1,8 @@
 """Live API checks for company research + RAG (needs api + chroma up)."""
 
-from collections.abc import Iterator
 from uuid import uuid4
 
 import httpx
-import pytest
-
-
-@pytest.fixture
-def api_client() -> Iterator[httpx.Client]:
-    with httpx.Client(base_url="http://127.0.0.1:8080", timeout=60.0) as client:
-        yield client
 
 
 def test_research_indexes_and_context_search(api_client: httpx.Client) -> None:

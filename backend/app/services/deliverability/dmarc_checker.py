@@ -16,7 +16,9 @@ class DMARCChecker:
 
     async def check(self, domain: str) -> dict[str, Any]:
         txts = await self.resolver.resolve_txt(f"_dmarc.{domain}")
-        records = [item.strip() for item in txts if "v=DMARC1" in item.upper().replace(" ", "")]
+        records = [
+            item.strip() for item in txts if "v=dmarc1" in item.replace(" ", "").lower()
+        ]
         if not records:
             return {
                 "valid": False,

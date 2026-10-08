@@ -107,7 +107,8 @@ class WarmupEmulator:
                 events_created += 1
                 bounced += 1
                 continue
-            open_p = min(1.0, cfg.peer_open_rate * (mailbox.reputation_score / 50.0))
+            reputation = mailbox.reputation_score if mailbox.reputation_score is not None else 0.0
+            open_p = min(1.0, cfg.peer_open_rate * (reputation / 50.0))
             if self.rng.random() < open_p:
                 self.db.add(
                     WarmupEvent(
@@ -152,11 +153,11 @@ class WarmupEmulator:
                 )
                 events_created += 1
 
-        mailbox.total_sent += send_count
-        mailbox.total_opened += opened
-        mailbox.total_replied += replied
-        mailbox.total_bounced += bounced
-        mailbox.total_spam_reports += spam
+        mailbox.total_sent = (mailbox.total_sent or 0) + send_count
+        mailbox.total_opened = (mailbox.total_opened or 0) + opened
+        mailbox.total_replied = (mailbox.total_replied or 0) + replied
+        mailbox.total_bounced = (mailbox.total_bounced or 0) + bounced
+        mailbox.total_spam_reports = (mailbox.total_spam_reports or 0) + spam
         mailbox.emails_sent_today = send_count
         mailbox.last_warmup_event_at = now
         mailbox.reputation_score = self._compute_reputation(mailbox)

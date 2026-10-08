@@ -38,7 +38,8 @@ class RetailCrmClient:
             "customFields": {"title": person.title} if person.title else {},
         }
         if company is not None:
-            customer["customFields"] = {**customer.get("customFields") or {}, "company": company.name}
+            existing = customer.get("customFields") or {}
+            customer["customFields"] = {**existing, "company": company.name}
         request = {"customer": customer}
         url = f"{self.base_url}/api/v5/customers/create"
         raw, err = await self._post(url, request)

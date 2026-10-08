@@ -51,6 +51,16 @@ def _mailbox(**kwargs: object) -> Mailbox:
         domain=str(kwargs.pop("domain", "example.com")),
     )
     row.id = uuid4()
+    row.status = MailboxStatus.NEW
+    row.warmup_day = 0
+    row.daily_limit = 5
+    row.emails_sent_today = 0
+    row.total_sent = 0
+    row.total_opened = 0
+    row.total_replied = 0
+    row.total_bounced = 0
+    row.total_spam_reports = 0
+    row.reputation_score = 50.0
     for key, value in kwargs.items():
         setattr(row, key, value)
     return row

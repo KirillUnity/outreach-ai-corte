@@ -22,10 +22,14 @@ class _MemDb:
         self.rows: list[EmailCandidate] = []
 
     def add(self, row: EmailCandidate) -> None:
+        if getattr(row, "id", None) is None:
+            row.id = uuid4()
         self.rows.append(row)
 
     async def get(self, model, ident):  # type: ignore[no-untyped-def]
         if model is Person and ident == self.person.id:
+            return self.person
+        if model is Person:
             return self.person
         if model is Company and self.company is not None and ident == self.company.id:
             return self.company

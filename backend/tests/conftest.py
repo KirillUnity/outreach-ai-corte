@@ -1,5 +1,8 @@
 """Shared fixtures for parser unit tests (no database, no network)."""
 
+from collections.abc import Iterator
+
+import httpx
 import pytest
 
 from app.core.config import ParserSettings, Settings
@@ -36,3 +39,18 @@ def mock_html() -> str:
       </body>
     </html>
     """
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line("markers", "integration: live API on http://127.0.0.1:8080")
+
+
+@pytest.fixture
+def api_client() -> Iterator[httpx.Client]:
+    """HTTP client for Docker integration tests; skip when the API is down."""
+    try:
+        httpx.get("http://127.0.0.1:8080/api/v1/health", timeout=2.0)
+    except httpx.HTTPError:
+        pytest.skip("API not running at :8080")
+    with httpx.Client(base_url="http://127.0.0.1:8080", timeout=60.0) as client:
+        yield client

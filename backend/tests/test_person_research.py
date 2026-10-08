@@ -1,17 +1,9 @@
 """Integration tests for POST /persons/research against the running API container."""
 
-from collections.abc import Iterator
 from uuid import uuid4
 
 import httpx
 import pytest
-
-
-@pytest.fixture
-def api_client() -> Iterator[httpx.Client]:
-    """HTTP to uvicorn in this container (sync client — no event-loop teardown races)."""
-    with httpx.Client(base_url="http://127.0.0.1:8080", timeout=30.0) as client:
-        yield client
 
 
 def _url(slug: str) -> str:
