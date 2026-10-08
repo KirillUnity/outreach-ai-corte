@@ -495,12 +495,15 @@ docker stats outreach-neo4j   # stay under ~1 GB
 
 ## Docs
 
+- How it works (RU, architecture + runbook): [docs/guide/how-it-works.ru.md](docs/guide/how-it-works.ru.md)
+- Python for Kotlin developers (RU, mappings + methods + patterns): [docs/guide/python-for-kotlin-devs.ru.md](docs/guide/python-for-kotlin-devs.ru.md)
 - Swagger UI: http://localhost:8080/docs
 - ReDoc: http://localhost:8080/redoc
 - **Days 1–35 recap (canonical):** [RU](research/days-1-35-summary.ru.md) · [EN](research/days-1-35-summary.en.md)
 - Days 1–27 historical slice: [RU](research/days-1-27-summary.ru.md) · [EN](research/days-1-27-summary.en.md)
 - Days 1–20 historical slice: [RU](research/days-1-20-summary.ru.md) · [EN](research/days-1-20-summary.en.md)
 - Testing and coverage: [docs/TESTING.md](docs/TESTING.md)
+- Weekly documentation prompts (portfolio guides): [docs/week-prompts/README.md](docs/week-prompts/README.md)
 - Days 1–12 recap: [RU](research/days-1-12-summary.ru.md) · [EN](research/days-1-12-summary.en.md)
 - Days 1–8 recap: [RU](research/days-1-8-summary.ru.md) · [EN](research/days-1-8-summary.en.md)
 - Days 1–5 only: [RU](research/days-1-5-summary.ru.md) · [EN](research/days-1-5-summary.en.md)
