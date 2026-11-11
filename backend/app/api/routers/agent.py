@@ -34,6 +34,7 @@ def _from_state(state: OutreachState) -> AgentRunResponse:
         tokens_input=int(state.get("total_tokens_input") or 0),
         tokens_output=int(state.get("total_tokens_output") or 0),
         estimated_cost_usd=float(state.get("total_cost_usd") or 0.0),
+        run_note=state.get("run_note") or None,
         iterations=int(state.get("iteration") or 0),
         errors=list(state.get("errors") or []),
     )
@@ -55,6 +56,7 @@ def _from_row(row: AgentRun) -> AgentRunResponse:
         tokens_input=row.tokens_input,
         tokens_output=row.tokens_output,
         estimated_cost_usd=row.cost_usd,
+        run_note=final.get("run_note") or None,
         iterations=row.iterations,
         errors=list(final.get("errors") or []),
         created_at=row.created_at,

@@ -1,11 +1,34 @@
 """Shared fixtures for parser unit tests (no database, no network)."""
 
+import sys
+import types
 from collections.abc import Iterator
 
 import httpx
 import pytest
 
 from app.core.config import ParserSettings, Settings
+
+
+def _allow_rag_unit_tests_without_chromadb() -> None:
+    """Keep RAG unit imports working when the Chroma package is absent.
+
+    Quality checks rank hash vectors in memory. RAG service tests replace the
+    client. When ``chromadb`` is installed this is a no-op.
+    """
+    try:
+        import chromadb  # noqa: F401
+    except ModuleNotFoundError:
+        module = types.ModuleType("chromadb")
+
+        class HttpClient:
+            """Import stand-in. Unit tests never construct a live client."""
+
+        module.HttpClient = HttpClient
+        sys.modules["chromadb"] = module
+
+
+_allow_rag_unit_tests_without_chromadb()
 
 
 @pytest.fixture

@@ -1,0 +1,64 @@
+{
+  "questions": [
+    {
+      "question": "Какой ежемесячный тариф для стартапов?",
+      "expected_id": "pricing-startups",
+      "rejected_id": "office-ferns",
+      "fragments": [
+        {
+          "id": "office-ferns",
+          "text": "The lobby keeps ferns that need water twice a week. Note 0."
+        },
+        {
+          "id": "pricing-startups",
+          "text": "Pricing starts at a simple monthly fee for startups. Note 0."
+        }
+      ]
+    },
+    {
+      "question": "Как биллинг сверяет выплаты платформ?",
+      "expected_id": "billing-payouts",
+      "rejected_id": "canteen-menu",
+      "fragments": [
+        {
+          "id": "canteen-menu",
+          "text": "Thursday lunch in the canteen is lentil soup and bread. Note 8."
+        },
+        {
+          "id": "billing-payouts",
+          "text": "The billing API helps finance teams reconcile payouts. Note 0."
+        }
+      ]
+    },
+    {
+      "question": "Куда писать, чтобы устроиться разработчиком?",
+      "expected_id": "engineering-jobs",
+      "rejected_id": "warehouse-hours",
+      "fragments": [
+        {
+          "id": "warehouse-hours",
+          "text": "The warehouse gate opens at six and closes at twenty two. Note 0."
+        },
+        {
+          "id": "engineering-jobs",
+          "text": "Engineering roles are open and candidates write to careers. Note 0."
+        }
+      ]
+    },
+    {
+      "question": "Какие поля есть у черновика письма?",
+      "expected_id": "draft-fields",
+      "rejected_id": "parking-rules",
+      "fragments": [
+        {
+          "id": "parking-rules",
+          "text": "Visitor parking is limited to two hours behind the annex. Note 0."
+        },
+        {
+          "id": "draft-fields",
+          "text": "An outreach draft has a subject, a body, and a hold decision. Note 0."
+        }
+      ]
+    }
+  ]
+}

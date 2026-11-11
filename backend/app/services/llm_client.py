@@ -15,6 +15,9 @@ from app.services.tracing import TracingService, get_tracing
 
 logger = logging.getLogger(__name__)
 
+# Shown on AgentRunResponse when LLM_MODE=mock. Real runs leave the field empty.
+STUDY_RUN_NOTE = "учебный прогон, модель не вызывалась"
+
 _FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 
 
@@ -232,6 +235,7 @@ class LLMClient:
             "tokens_input": tokens_input,
             "tokens_output": tokens_output,
             "model": used_model,
+            "run_note": STUDY_RUN_NOTE,
         }
 
     @staticmethod

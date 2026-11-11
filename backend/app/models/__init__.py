@@ -9,6 +9,7 @@ from app.models.email_candidate import EmailCandidate, EmailCandidateSource, Ema
 from app.models.email_draft import EmailDraft
 from app.models.enums import CompanySize, EmailGoal, EmailStatus
 from app.models.mailbox import Mailbox, MailboxStatus
+from app.models.outbound_attempt import OutboundAttempt, OutboundAttemptStatus
 from app.models.outreach_sequence import (
     EnrollmentStatus,
     OutreachSequence,
@@ -34,6 +35,8 @@ __all__ = [
     "EmailStatus",
     "Mailbox",
     "MailboxStatus",
+    "OutboundAttempt",
+    "OutboundAttemptStatus",
     "EnrollmentStatus",
     "OutreachSequence",
     "OutreachSequenceEnrollment",

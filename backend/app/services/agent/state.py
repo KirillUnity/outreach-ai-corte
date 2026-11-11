@@ -40,6 +40,8 @@ class OutreachState(TypedDict):
     draft_id: NotRequired[UUID | None]
     decision: NotRequired[str | None]
     decision_reason: NotRequired[str | None]
+    # Study runs only. Missing on older final_state rows.
+    run_note: NotRequired[str | None]
 
     iteration: int
     total_tokens_input: int

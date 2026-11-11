@@ -24,6 +24,46 @@ curl http://localhost:8080/api/v1/health
 # UI: http://localhost:3000
 ```
 
+## Один прогон
+
+Leave `LLM_MODE=mock` (the default). One path, on the API only.
+
+1. Create a company with a domain and a short description (`name`, `description`).
+2. Create a person in that company: name and role text (`title`).
+3. `POST /api/v1/agent/outreach` with `person_id`, `sender_name`, `sender_title`, and `sender_company`.
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/companies/ \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"acme.com","name":"Acme","description":"Acme builds billing software for mid-market finance teams."}'
+
+curl -s -X POST http://localhost:8080/api/v1/persons/ \
+  -H "Content-Type: application/json" \
+  -d '{"first_name":"Ada","last_name":"Lovelace","title":"Head of Finance","company_id":"<company_id>"}'
+
+curl -s -X POST http://localhost:8080/api/v1/agent/outreach \
+  -H "Content-Type: application/json" \
+  -d '{"person_id":"<person_id>","sender_name":"Kirill","sender_title":"Founder","sender_company":"Northwind"}'
+```
+
+Study-mode response (model is not called; cost 0 is the expected study outcome):
+
+```json
+{
+  "email_subject": "Quick idea for your team",
+  "email_body": "I noticed your team is investing in better billing workflows. We help founders cut the time they spend on outreach research. Would you have 15 minutes next week to compare notes?",
+  "decision": "hold",
+  "estimated_cost_usd": 0,
+  "run_note": "учебный прогон, модель не вызывалась"
+}
+```
+
+`decision` stays `hold` while `AGENT_REQUIRE_HUMAN_APPROVAL=true` (the default): the run is waiting for a person to confirm.
+
+In real mode (`LLM_MODE=real`) one cloud chat completion is sent and the price comes from the CostTracker table for the model that answered; if that call fails, the draft is not replaced with a successful canned text.
+
+Nothing is sent outward.
+
 ## UI
 
 React dashboard (Vite + Tailwind + `react-force-graph-2d`): [frontend/README.md](frontend/README.md).

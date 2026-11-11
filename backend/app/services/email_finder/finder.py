@@ -19,6 +19,7 @@ from app.services.email_finder.apollo_client import ApolloClient
 from app.services.email_finder.hunter_client import HunterClient
 from app.services.email_finder.pattern_generator import PatternGenerator
 from app.services.email_finder.smtp_verifier import SMTPVerifier
+from app.services.outbound_attempts import lookup_hunter_email
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,14 @@ class EmailFinder:
             )
 
         if use_hunter and host and self.hunter.enabled:
-            hits = await self.hunter.find_email(person.first_name, person.last_name, host)
+            hits = await lookup_hunter_email(
+                self.db,
+                self.hunter,
+                first_name=person.first_name,
+                last_name=person.last_name,
+                domain=host,
+                now=datetime.now(timezone.utc),
+            )
             for hit in hits:
                 created.append(
                     await self._upsert(

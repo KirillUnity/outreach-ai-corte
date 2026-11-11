@@ -156,6 +156,7 @@ class EmailGenerator:
             "tokens_output": int(result["tokens_output"]),
             "estimated_cost_usd": record.estimated_cost_usd if record else 0.0,
             "model": result["model"],
+            "run_note": result.get("run_note"),
             "validation_errors": [] if valid else errors,
             "retried": retried,
             "quality_scores": scores,

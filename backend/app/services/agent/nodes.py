@@ -343,6 +343,7 @@ async def generate_email_node(
         "total_cost_usd": float(state.get("total_cost_usd") or 0.0)
         + float(result.get("estimated_cost_usd") or 0.0),
         "rag_context": result.get("rag_context_used") or state.get("rag_context") or [],
+        "run_note": result.get("run_note"),
     }
 
 

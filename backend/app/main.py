@@ -21,6 +21,7 @@ from app.api.routers import (
     graph,
     health,
     metrics,
+    outbound_attempts,
     persons,
     sequences,
     warmup,
@@ -104,3 +105,4 @@ app.include_router(agent.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(graph.router, prefix="/api/v1")
 app.include_router(warmup.router, prefix="/api/v1")
+app.include_router(outbound_attempts.router, prefix="/api/v1")

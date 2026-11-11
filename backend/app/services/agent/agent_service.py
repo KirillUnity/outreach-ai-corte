@@ -21,7 +21,7 @@ from app.services.deliverability_checker import DeliverabilityChecker
 from app.services.domain_health_service import DomainHealthService
 from app.services.email_draft_service import EmailDraftService
 from app.services.email_generator import EmailGenerator
-from app.services.llm_client import LLMClient
+from app.services.llm_client import LLMClient, STUDY_RUN_NOTE
 from app.services.metrics import note_agent_run
 from app.services.output_validator import OutputValidator
 from app.services.person_service import PersonService
@@ -156,6 +156,8 @@ class OutreachAgentService:
         """Invoke the graph once. thread_id is unique so we never resume a stale run."""
         graph = self._build_graph()
         initial = empty_outreach_state(person_id, goal, sender_info, **kwargs)
+        if self.settings.llm.mode == "mock":
+            initial["run_note"] = STUDY_RUN_NOTE
         thread_id = f"{person_id}:{uuid4()}"
         trace_id = self.tracing.start_trace(
             name=f"outreach_agent_{person_id}",

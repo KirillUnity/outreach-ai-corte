@@ -33,13 +33,19 @@ class CostTracker:
         self.records: list[CostRecord] = []
 
     def estimate_chat(self, model: str, tokens_input: int, tokens_output: int) -> float:
-        """Return USD for a chat completion using a small static price table."""
+        """Return USD for a chat completion using a small static price table.
+
+        Names that start with ``mock-`` cost 0: study mode never called a cloud
+        model. That zero is the study outcome, not a free gpt-4o or gpt-4o-mini call.
+        """
+        if model.startswith("mock-"):
+            return 0.0
         input_rate, output_rate = _CHAT_PRICES.get(model, (0.15, 0.60))
         cost = (tokens_input / 1_000_000) * input_rate + (tokens_output / 1_000_000) * output_rate
         return round(cost, 8)
 
     def log_chat(self, model: str, tokens_input: int, tokens_output: int) -> CostRecord:
-        """Store a chat call and log it. Safe to call from mock mode (cost is ~0)."""
+        """Store a chat call and log it. Study-mode ``mock-`` names record 0."""
         cost = self.estimate_chat(model, tokens_input, tokens_output)
         record = CostRecord(
             model=model,

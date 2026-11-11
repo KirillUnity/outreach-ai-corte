@@ -36,6 +36,13 @@ class AgentRunResponse(BaseModel):
     tokens_input: int = 0
     tokens_output: int = 0
     estimated_cost_usd: float = 0.0
+    run_note: str | None = Field(
+        default=None,
+        description=(
+            "Study mode only: «учебный прогон, модель не вызывалась». "
+            "Empty when a cloud model was called. Missing on older saved runs."
+        ),
+    )
     iterations: int = 0
     errors: list[str] = []
     created_at: datetime | None = None
