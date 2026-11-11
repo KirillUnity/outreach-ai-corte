@@ -1,5 +1,6 @@
 """Outbound attempt rows for a mocked Hunter 429. No vendor socket is opened."""
 
+import os
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -32,18 +33,36 @@ def _settings() -> SimpleNamespace:
     )
 
 
+def _attempt_engine():
+    """Use CI Postgres when it is configured. Otherwise an in-memory SQLite file.
+
+    ``aiosqlite`` is not a project dependency. CI sets ``DATABASE_URL`` and
+    already applies Alembic, so those runs never import SQLite.
+    """
+    url = os.environ.get("DATABASE_URL", "")
+    if url.startswith("postgres"):
+        return create_async_engine(url), False
+    pytest.importorskip("aiosqlite")
+    return (
+        create_async_engine(
+            "sqlite+aiosqlite:///:memory:",
+            poolclass=StaticPool,
+            connect_args={"check_same_thread": False},
+        ),
+        True,
+    )
+
+
 @pytest.fixture
 async def db() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        poolclass=StaticPool,
-        connect_args={"check_same_thread": False},
-    )
-    async with engine.begin() as conn:
-        await conn.run_sync(OutboundAttempt.__table__.create)
+    engine, create_table = _attempt_engine()
+    if create_table:
+        async with engine.begin() as conn:
+            await conn.run_sync(OutboundAttempt.__table__.create)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     async with sessions() as session:
         yield session
+        await session.rollback()
     await engine.dispose()
 
 
